@@ -26,22 +26,10 @@ A paragraph is a section of the sheet (e.g. verse, chorus, intro).
 
 | Field   | Type   | Required | Description |
 |--------|--------|----------|-------------|
-| `type` | string | yes      | Section type. See [Paragraph types](#paragraph-types). |
-| `label`| string | no       | Section title as in the source (e.g. `"Verse 1"`, `"Chorus"`, `"Intro"`). Used when emitting tab output. |
+| `label`| string | no       | Section title (e.g. `"Verse 1"`, `"Chorus"`, `"Intro"`). Rendered as `[label]` in tab output when non-empty. Empty or missing label is not rendered. |
 | `lines`| array  | yes      | List of [lines](#line). May be empty. |
 
-### Paragraph types
-
-- `verse` — verse section
-- `chorus` — chorus
-- `bridge`
-- `intro`
-- `outro`
-- `tab`
-- `none` — e.g. title block with no section header
-- `indeterminate` — placeholder (e.g. section header only, no content); often has empty `lines`
-
-Order of paragraphs in the array is document order. Consecutive paragraphs may include an `indeterminate` one (with a `label` like `"Verse 1"`) followed by the real content paragraph with the same `label` and `type`.
+Order of paragraphs in the array is document order.
 
 ## Line
 
@@ -68,14 +56,13 @@ A segment is one aligned “cell”: one chord, one lyrics slice, one pinyin sli
 
 ## Example (minimal)
 
-Title plus one line of content:
+Title plus one line of content (no section header, so no `label` or empty `label`):
 
 ```json
 {
   "meta": {},
   "paragraphs": [
     {
-      "type": "none",
       "lines": [
         {
           "segments": [
@@ -94,14 +81,13 @@ Title plus one line of content:
 
 ## Example (one verse line)
 
-One verse line with four segments (chord + lyrics + pinyin per segment):
+One verse line with four segments (chord + lyrics + pinyin per segment). Non-empty `label` is rendered as `[Verse 1]`:
 
 ```json
 {
   "meta": {},
   "paragraphs": [
     {
-      "type": "verse",
       "label": "Verse 1",
       "lines": [
         {
@@ -124,7 +110,6 @@ Intro with chord-only segments (empty lyrics and pinyin):
 
 ```json
 {
-  "type": "intro",
   "label": "Intro",
   "lines": [
     { "segments": [] },
@@ -144,7 +129,7 @@ Intro with chord-only segments (empty lyrics and pinyin):
 - **Encoding**: JSON is UTF-8. Lyrics and pinyin may contain any Unicode (e.g. Chinese, Latin, spaces).
 - **Spacing**: Pinyin often includes spaces between syllables (e.g. `"dang tian "`). Chord and lyrics may be empty for that segment.
 - **Blank lines**: A line with `segments: []` or a single segment with all empty strings is treated as a blank line when emitting.
-- **Section headers**: Only paragraphs with `type` not `none` or `indeterminate` and with a `label` emit a section header like `[Verse 1]` in the tab. The `label` is used as-is (with brackets added by the formatter).
+- **Section headers**: A paragraph with a non-empty `label` (after trim) emits a section header `[label]` in the tab. Empty or missing `label` emits no section header.
 
 ## Generation and consumption
 
@@ -154,4 +139,4 @@ Intro with chord-only segments (empty lyrics and pinyin):
 
 ## TypeScript types
 
-The structure is defined in `src/types/ir.ts`: `Ir`, `IrParagraph`, `IrLine`, `Segment`, `ParagraphType`, `IrMeta`.
+The structure is defined in `src/types/ir.ts`: `Ir`, `IrParagraph`, `IrLine`, `Segment`, `IrMeta`.

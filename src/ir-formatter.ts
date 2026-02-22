@@ -94,9 +94,10 @@ export function irToTabString(ir: Ir): string {
   for (let p = 0; p < ir.paragraphs.length; p++) {
     const para = ir.paragraphs[p];
 
-    // Section header (skip indeterminate and none)
-    if (para.type !== 'none' && para.type !== 'indeterminate' && para.label) {
-      out.push(`[${para.label}]`);
+    // Section header: only when label is non-empty
+    const labelStr = para.label != null ? String(para.label).trim() : '';
+    if (labelStr !== '') {
+      out.push(`[${labelStr}]`);
       out.push('');
     }
 

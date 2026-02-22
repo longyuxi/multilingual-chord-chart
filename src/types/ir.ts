@@ -15,20 +15,8 @@ export interface IrLine {
   segments: Segment[];
 }
 
-export type ParagraphType =
-  | 'verse'
-  | 'chorus'
-  | 'bridge'
-  | 'intro'
-  | 'outro'
-  | 'none'
-  | 'indeterminate'
-  | 'tab'
-  | string;
-
 export interface IrParagraph {
-  type: ParagraphType;
-  /** Section title as in the source, e.g. "Verse 1", "Intro". Used when writing tab. */
+  /** Section title. When non-empty, rendered as [label] in tab output; when empty or missing, no section header is rendered. */
   label?: string;
   lines: IrLine[];
 }

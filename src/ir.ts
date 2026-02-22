@@ -6,28 +6,18 @@
 import ChordSheetJS from 'chordsheetjs';
 import type { Ir, IrLine, IrParagraph, Segment } from './types/ir';
 
-/** ChordSheetJS paragraph type constants (lowercase in our IR, uppercase in lib) */
-const PARAGRAPH_TYPE_MAP: Record<string, string> = {
-  verse: (ChordSheetJS as unknown as { VERSE: string }).VERSE ?? 'verse',
-  chorus: (ChordSheetJS as unknown as { CHORUS: string }).CHORUS ?? 'chorus',
-  bridge: (ChordSheetJS as unknown as { BRIDGE?: string }).BRIDGE ?? 'bridge',
-  intro: (ChordSheetJS as unknown as { BRIDGE?: string }).BRIDGE ?? 'intro', // no INTRO in lib, use bridge-like
-  outro: 'outro',
-  none: (ChordSheetJS as unknown as { NONE: string }).NONE ?? 'none',
-  indeterminate: (ChordSheetJS as unknown as { INDETERMINATE: string }).INDETERMINATE ?? 'indeterminate',
-  tab: (ChordSheetJS as unknown as { TAB: string }).TAB ?? 'tab',
-};
+/** ChordSheetJS paragraph type for lines we emit (IR has no type, we use a default). */
+const DEFAULT_CHORDSHEET_LINE_TYPE = (ChordSheetJS as unknown as { VERSE: string }).VERSE ?? 'verse';
 
-function toChordSheetType(irType: string): string {
-  const normalized = irType.toLowerCase().trim();
-  return PARAGRAPH_TYPE_MAP[normalized] ?? (ChordSheetJS as unknown as { NONE: string }).NONE ?? 'none';
+/** Heuristic: segment chord looks like a chord symbol (e.g. Am, F#m7), not metadata (Capo=4, title text). */
+function looksLikeChordSymbol(s: string): boolean {
+  const t = (s ?? '').trim();
+  if (!t) return false;
+  return /^[A-Ga-g][#b]?\d*[mM]?(maj|min|sus|dim|aug|maj7|min7|add|omit)*\d*(\/[A-Ga-g][#b]?)?$/i.test(t) || /^[A-G][#b]?(maj|min|m|M|sus|dim|aug)?\d*$/i.test(t);
 }
 
-/** Capitalise for section header when label is missing: "verse" -> "Verse". */
-function sectionLabelFromType(type: string): string {
-  const t = type.trim();
-  if (!t) return 'Section';
-  return t.charAt(0).toUpperCase() + t.slice(1).toLowerCase();
+function toChordSheetType(_label?: string): string {
+  return DEFAULT_CHORDSHEET_LINE_TYPE;
 }
 
 export interface SongToIrOptions {
@@ -61,6 +51,8 @@ export function songToIr(
     }
   }
   let sectionLabelIndex = 0;
+  /** When we see a paragraph that is only a section header line (e.g. [Verse]), assign that label to the next content paragraph. */
+  let pendingSectionLabel: string | undefined;
 
   const meta: Ir['meta'] = {};
   if (song.metadata && typeof song.metadata === 'object') {
@@ -87,23 +79,176 @@ export function songToIr(
       }
       lines.push({ segments });
     }
+
+    const allText = lines.map((l) => l.segments.map((s) => (textAsPinyin ? s.pinyin : s.lyrics)).join('')).join('').trim();
+
+    // ChordSheetJS may set para.label to the section name (e.g. 'Chorus') on both section-header
+    // paragraphs and mixed header+content paragraphs. Prefer it over the inherited pendingSectionLabel
+    // so switching sections always picks up the correct new label.
     const paraLabel = (para as { label?: string | null }).label;
-    let label: string | undefined =
-      paraLabel != null && String(paraLabel).trim() !== '' ? String(paraLabel).trim() : undefined;
+    const newParaLabel = paraLabel != null && String(paraLabel).trim() !== '' ? String(paraLabel).trim() : undefined;
+
+    // If any line is exactly [SectionName], use it as this paragraph's label and remove that line (ChordSheetJS may put the header on the first or second line).
+    let label: string | undefined = newParaLabel ?? pendingSectionLabel;
+    let linesToPush = lines;
+    let skipParagraph = false;
+    const sectionHeaderRe = /^\[([^\]]+)\]$/;
+    for (let i = 0; i < lines.length; i++) {
+      const lineText = lines[i].segments.map((s) => (textAsPinyin ? s.pinyin : s.lyrics)).join('').trim();
+      const m = lineText.match(sectionHeaderRe);
+      if (m) {
+        const sectionName = m[1].trim();
+        linesToPush = lines.slice(0, i).concat(lines.slice(i + 1));
+        if (linesToPush.length === 0) {
+          pendingSectionLabel = sectionName;
+          if (sectionLabelIndex < sectionLabelsFromRaw.length && sectionLabelsFromRaw[sectionLabelIndex] === sectionName) {
+            sectionLabelIndex += 1;
+          }
+          // Emit a paragraph for this section so we don't lose the title (e.g. [Interlude] then [Chorus] with no content).
+          paragraphs.push({ label: sectionName, lines: [] });
+          skipParagraph = true;
+        } else {
+          label = sectionName;
+          pendingSectionLabel = sectionName; // so following lines in this section get the same label
+          if (sectionLabelIndex < sectionLabelsFromRaw.length && sectionLabelsFromRaw[sectionLabelIndex] === sectionName) {
+            sectionLabelIndex += 1;
+          }
+        }
+        break;
+      }
+    }
+    if (skipParagraph) continue;
+
+    // Empty paragraph whose entire text is blank and ChordSheetJS provided a section label: it is a
+    // section-header-only paragraph (e.g. [Interlude] with no content). Update pendingSectionLabel and
+    // emit a labeled empty paragraph so header-only sections are preserved in the output.
+    if (allText === '' && newParaLabel !== undefined) {
+      pendingSectionLabel = newParaLabel;
+      paragraphs.push({ label: newParaLabel, lines: [] });
+      continue;
+    }
+    // Empty paragraph with section type but no text and no ChordSheetJS label (fallback for older ChordSheetJS builds).
+    if (label === undefined && linesToPush.length === 0 && allText === '' && (para.type ?? 'none') !== 'none' && sectionLabelIndex < sectionLabelsFromRaw.length) {
+      const sectionLabel = sectionLabelsFromRaw[sectionLabelIndex];
+      sectionLabelIndex += 1;
+      if (paragraphs.length > 0) {
+        const last = paragraphs[paragraphs.length - 1];
+        // Only assign to previous paragraph if it looks like a chord/lyric block (multiple segments with chords), not title/metadata
+        const lastHasChordBlock = last.lines.some(
+          (l) => l.segments.filter((s) => looksLikeChordSymbol(s.chord ?? '')).length >= 2
+        );
+        if (last.label === undefined && lastHasChordBlock) {
+          last.label = sectionLabel;
+        }
+      }
+      pendingSectionLabel = sectionLabel;
+      continue;
+    }
+
+    // Paragraph is a chord/lyric block if it has a line with 2+ chord symbols (excludes metadata like title, Capo=4)
+    const isChordOrLyricBlock = linesToPush.some(
+      (l) => l.segments.filter((s) => looksLikeChordSymbol(s.chord ?? '')).length >= 2
+    );
+    // Assign next section label when this paragraph has chord-block content but no label (ChordSheetJS may put section headers after the block)
+    if (label === undefined && sectionLabelsFromRaw.length > 0 && sectionLabelIndex < sectionLabelsFromRaw.length && isChordOrLyricBlock) {
+      label = sectionLabelsFromRaw[sectionLabelIndex];
+      sectionLabelIndex += 1;
+    }
     if (label === undefined && sectionLabelsFromRaw.length > 0 && (para.type ?? 'none') !== 'none') {
       if (sectionLabelIndex < sectionLabelsFromRaw.length) {
         label = sectionLabelsFromRaw[sectionLabelIndex];
         sectionLabelIndex += 1;
       }
     }
+    // Don't use an inherited pending label for metadata-like paragraphs (no chord block); leave it for the next real block.
+    // But always honour a label that ChordSheetJS set explicitly on this paragraph (newParaLabel).
+    if (newParaLabel === undefined && label === pendingSectionLabel && !isChordOrLyricBlock) {
+      label = undefined;
+    }
+    // Keep pendingSectionLabel in sync so continuation paragraphs (para.label=null) in the same section
+    // inherit the correct label, even when the section changed via a mixed header+content paragraph.
+    if (label !== undefined) {
+      pendingSectionLabel = label;
+    }
+
     paragraphs.push({
-      type: (para.type ?? 'none') as IrParagraph['type'],
       ...(label !== undefined && { label }),
-      lines,
+      lines: linesToPush,
     });
   }
 
-  return { meta, paragraphs };
+  return {
+    meta,
+    paragraphs: mergeConsecutiveSectionsWithSameLabel(stripEmptySegmentsAndLines(paragraphs)),
+  };
+}
+
+/** Segment is empty if chord, lyrics, pinyin (and translation) are all empty or whitespace. */
+function isSegmentEmpty(s: Segment): boolean {
+  const t = (v: string | undefined) => (v ?? '').trim();
+  return !t(s.chord) && !t(s.lyrics) && !t(s.pinyin) && !t(s.translation);
+}
+
+/** Remove empty segments from each line, then remove lines that have no segments left. Done before merge. */
+function stripEmptySegmentsAndLines(paragraphs: IrParagraph[]): IrParagraph[] {
+  return paragraphs.map((para) => {
+    const lines = (para.lines ?? [])
+      .map((line) => ({
+        ...line,
+        segments: (line.segments ?? []).filter((s) => !isSegmentEmpty(s)),
+      }))
+      .filter((line) => line.segments.length > 0);
+    return { ...para, lines };
+  });
+}
+
+/** True if paragraph has no label and no meaningful content (no lines or only empty lines). */
+function isEmptyUnlabeled(para: IrParagraph): boolean {
+  if (para.label !== undefined && para.label !== '') return false;
+  if (!para.lines?.length) return true;
+  return para.lines.every(
+    (l) => !l.segments?.length || l.segments.every((s) => !s.chord && !s.lyrics && !s.pinyin)
+  );
+}
+
+/**
+ * Greedily merge neighboring paragraphs that have the same section label
+ * (e.g. multiple "Verse" blocks become one "Verse" with all lines).
+ * First collapses empty unlabeled paragraphs into the previous paragraph so that
+ * same-label sections become adjacent (e.g. Verse, blank, Verse -> one Verse).
+ */
+function mergeConsecutiveSectionsWithSameLabel(paragraphs: IrParagraph[]): IrParagraph[] {
+  if (paragraphs.length <= 1) return paragraphs;
+  // Collapse empty unlabeled paragraphs into the previous paragraph
+  const collapsed: IrParagraph[] = [];
+  for (let i = 0; i < paragraphs.length; i++) {
+    const p = paragraphs[i];
+    if (isEmptyUnlabeled(p) && collapsed.length > 0) {
+      collapsed[collapsed.length - 1] = {
+        ...collapsed[collapsed.length - 1],
+        lines: [...collapsed[collapsed.length - 1].lines, ...(p.lines ?? [])],
+      };
+    } else {
+      collapsed.push({ ...p, lines: [...(p.lines ?? [])] });
+    }
+  }
+  // Merge consecutive paragraphs with the same label
+  if (collapsed.length <= 1) return collapsed;
+  const result: IrParagraph[] = [];
+  let current: IrParagraph = { ...collapsed[0], lines: [...collapsed[0].lines] };
+  for (let i = 1; i < collapsed.length; i++) {
+    const p = collapsed[i];
+    const sameLabel =
+      current.label !== undefined && p.label !== undefined && current.label === p.label;
+    if (sameLabel) {
+      current = { ...current, lines: [...current.lines, ...p.lines] };
+    } else {
+      result.push(current);
+      current = { ...p, lines: [...p.lines] };
+    }
+  }
+  result.push(current);
+  return result;
 }
 
 /** ChordSheetJS Song-like type we build and pass to formatter */
@@ -136,14 +281,14 @@ export function irToSong(ir: Ir): BuiltSong {
 
   for (let p = 0; p < ir.paragraphs.length; p++) {
     const para = ir.paragraphs[p];
-    const lineType = toChordSheetType(para.type);
-    const sectionTitle = para.label ?? sectionLabelFromType(para.type);
+    const lineType = toChordSheetType(para.label);
+    const labelStr = para.label != null ? String(para.label).trim() : '';
 
-    // Emit section header line [Verse 1], [Chorus], etc. (except for type 'none')
-    if (para.type !== 'none' && para.type !== 'indeterminate') {
+    // Emit section header line [label] only when label is non-empty
+    if (labelStr !== '') {
       const titleLine = new Line({
         type: lineType,
-        items: [new ChordLyricsPair('', `[${sectionTitle}]`)],
+        items: [new ChordLyricsPair('', `[${labelStr}]`)],
       });
       lines.push(titleLine);
     }
