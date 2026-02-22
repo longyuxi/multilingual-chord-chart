@@ -1,47 +1,75 @@
 /**
  * In-house formatter: IR → chord tab text.
- * Uses Unicode East Asian Width (via wcwidth) so column counts match terminals and UAX #11.
- * See docs/fixed-width-rendering.md for why alignment can still be off in VS Code/Ultimate Guitar.
+ * CJK characters count as 5/3 width units (3 CJK = 5 Latin), Latin as 1; we track emitted width per segment (with rounding).
+ * See docs/fixed-width-rendering.md for context.
  */
 
 import wcwidth = require('wcwidth');
 import type { Ir, IrLine, IrParagraph, Segment } from './types/ir';
 
+/** So that 3 CJK chars = 5 Latin chars (per Ultimate Guitar eyeballing). */
+const CJK_WIDTH = 5 / 3;
+
 /**
- * Display width in terminal columns (Unicode UAX #11 / East Asian Width).
- * Wide/Full-width = 2, narrow = 1; combining = 0. Matches wcwidth(3) / POSIX.
+ * Display width with CJK = 5/3, Latin = 1 (fractional). Used for segment sizing and padding.
+ * Combining/control = 0 (via wcwidth).
  */
 export function displayWidth(s: string): number {
   if (!s) return 0;
-  const w = wcwidth(s);
-  return w < 0 ? s.length : w;
+  let w = 0;
+  for (let i = 0; i < s.length; i++) {
+    const cp = s.codePointAt(i)!;
+    const wc = wcwidth(cp >= 0x10000 ? String.fromCodePoint(cp) : s[i]);
+    if (wc <= 0) continue;
+    w += wc === 2 ? CJK_WIDTH : 1;
+    if (cp >= 0x10000) i++; // skip low surrogate
+  }
+  return w;
 }
 
-/** Pad string to target display width with trailing spaces (Latin width only for padding). */
-function padToWidth(s: string, width: number): string {
-  const have = displayWidth(s);
-  if (have >= width) return s;
-  return s + ' '.repeat(width - have);
+/** Pad string to target width (exact, fractional): add ceil(target - contentWidth) spaces. */
+function padToWidth(s: string, contentWidth: number, targetWidth: number): string {
+  if (contentWidth >= targetWidth) return s;
+  // Round the gap to avoid ceil(6.499999...) === 6 when we want 7 (e.g. 当天 → 7 spaces)
+  const gap = Math.round((targetWidth - contentWidth) * 100) / 100;
+  const n = Math.ceil(gap);
+  return s + ' '.repeat(n);
 }
 
 function formatLine(segments: Segment[]): { chordLine: string; lyricsLine: string; pinyinLine: string | null } {
   if (segments.length === 0) {
     return { chordLine: '', lyricsLine: '', pinyinLine: null };
   }
-  const widths = segments.map((seg) => {
+  const segmentTargets = segments.map((seg) => {
     const c = displayWidth(seg.chord ?? '');
     const l = displayWidth(seg.lyrics ?? '');
     const p = displayWidth(seg.pinyin ?? '');
     let w = Math.max(c, l, p, 1);
-    // Chord-only lines: leave at least one space after each chord so they don't clump (e.g. "F G Am")
     if (l === 0 && p === 0 && c > 0) w = Math.max(w, c + 1);
-    return w;
+    return { c, l, p, w };
   });
-  const chordLine = segments.map((seg, i) => padToWidth(seg.chord ?? '', widths[i])).join('');
-  const lyricsLine = segments.map((seg, i) => padToWidth(seg.lyrics ?? '', widths[i])).join('');
+  // Emit chord line first; track emitted width per segment (chord + spaces, rounded up).
+  const emittedWidths: number[] = [];
+  const chordParts = segments.map((seg, i) => {
+    const { c, w } = segmentTargets[i];
+    const n = Math.ceil(w - c);
+    const emitted = c + n;
+    emittedWidths.push(emitted);
+    return (seg.chord ?? '') + ' '.repeat(n);
+  });
+  const chordLine = chordParts.join('');
+  const lyricsLine = segments.map((seg, i) => {
+    const l = segmentTargets[i].l;
+    const e = emittedWidths[i];
+    return padToWidth(seg.lyrics ?? '', l, e);
+  }).join('');
   const hasPinyin = segments.some((seg) => (seg.pinyin ?? '').trim() !== '');
   const pinyinLine = hasPinyin
-    ? segments.map((seg, i) => padToWidth(seg.pinyin ?? '', widths[i])).join('')
+    ? segments.map((seg, i) => {
+        const p = segmentTargets[i].p;
+        const e = emittedWidths[i];
+        return padToWidth(seg.pinyin ?? '', p, e);
+      }).join('')
     : null;
   return { chordLine, lyricsLine, pinyinLine };
 }
