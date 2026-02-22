@@ -1,6 +1,6 @@
 /**
  * Parse an Ultimate Guitar chord tab file and output the IR (JSON and/or LM text).
- * Usage: node dist/tab-to-ir.js <input.txt> [output.ir.json] [--lm] [--pinyin]
+ * Usage: node dist/tab-to-ir.js <input.txt> [output.ir.json] [--pinyin]
  *
  * --pinyin  Treat the parsed line text as pinyin (IR pinyin field); lyrics stay empty.
  *           Default: line text goes into lyrics.
@@ -9,13 +9,13 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import ChordSheetJS from 'chordsheetjs';
-import { songToIr, irToLmText } from './ir';
+import { songToIr } from './ir';
 import type { Ir } from './types/ir';
 
 function main(): void {
   const args = process.argv.slice(2).filter((a) => a !== '');
   const textAsPinyin = args.includes('--pinyin');
-  const rest = args.filter((a) => a !== '--lm' && a !== '--pinyin');
+  const rest = args.filter((a) => a !== '--pinyin');
   const inputPath = rest[0];
   let outputPath = rest[1];
 
@@ -37,13 +37,6 @@ function main(): void {
   }
   fs.writeFileSync(outputPath, JSON.stringify(ir, null, 2), 'utf8');
   console.log('Wrote', outputPath);
-
-  const writeLm = rest.length <= 1;
-  if (writeLm) {
-    const lmPath = outputPath.replace(/\.ir\.json$/i, '.ir.lm.txt').replace(/\.json$/i, '.ir.lm.txt');
-    fs.writeFileSync(lmPath, irToLmText(ir), 'utf8');
-    console.log('Wrote', lmPath);
-  }
 }
 
 main();

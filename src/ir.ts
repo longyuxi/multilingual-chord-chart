@@ -149,7 +149,8 @@ export function irToSong(ir: Ir): BuiltSong {
     }
 
     for (const irLine of para.lines) {
-      const items = (irLine.segments ?? []).map(
+      const segments = irLine.segments ?? [];
+      const items = segments.map(
         (seg) => new ChordLyricsPair(seg.chord ?? '', seg.lyrics ?? '')
       );
       if (items.length === 0) {
@@ -157,6 +158,14 @@ export function irToSong(ir: Ir): BuiltSong {
       }
       const line = new Line({ type: lineType, items });
       lines.push(line);
+      // If any segment has pinyin, emit a second line (chord-free) with pinyin so output shows both lyrics and pinyin.
+      const hasPinyin = segments.some((seg) => (seg.pinyin ?? '').trim() !== '');
+      if (hasPinyin) {
+        const pinyinItems = segments.map(
+          (seg) => new ChordLyricsPair('', seg.pinyin ?? '')
+        );
+        lines.push(new Line({ type: lineType, items: pinyinItems }));
+      }
     }
 
     if (p < ir.paragraphs.length - 1) {
@@ -166,85 +175,4 @@ export function irToSong(ir: Ir): BuiltSong {
 
   song.lines = lines;
   return song;
-}
-
-/**
- * Serialize IR to LM-friendly text: tab-separated chord, lyrics, pinyin per line; [Section] headers.
- */
-export function irToLmText(ir: Ir): string {
-  const out: string[] = [];
-  if (ir.meta && Object.keys(ir.meta).length > 0) {
-    Object.entries(ir.meta).forEach(([k, v]) => {
-      if (v != null && typeof v === 'string' && v.trim()) out.push(`${k}: ${v}`);
-    });
-    out.push('');
-  }
-  for (const para of ir.paragraphs) {
-    const typeLabel = para.type === 'none' ? '' : `[${para.type}]`;
-    if (typeLabel) out.push(typeLabel);
-    for (const line of para.lines) {
-      for (const seg of line.segments) {
-        out.push([seg.chord ?? '', seg.lyrics ?? '', seg.pinyin ?? ''].join('\t'));
-      }
-    }
-    out.push('');
-  }
-  return out.join('\n').replace(/\n{3,}/g, '\n\n').trimEnd();
-}
-
-/**
- * Parse LM text back to IR (e.g. after the LM filled pinyin).
- */
-export function lmTextToIr(text: string): Ir {
-  const lines = text.split(/\r?\n/);
-  const meta: Ir['meta'] = {};
-  const paragraphs: IrParagraph[] = [];
-  let currentParagraph: IrParagraph | null = null;
-  let currentLineSegments: Segment[] = [];
-
-  function flushLine(): void {
-    if (currentLineSegments.length > 0) {
-      if (!currentParagraph) {
-        currentParagraph = { type: 'none', lines: [] };
-        paragraphs.push(currentParagraph);
-      }
-      currentParagraph.lines.push({ segments: currentLineSegments });
-      currentLineSegments = [];
-    }
-  }
-
-  function flushParagraph(): void {
-    flushLine();
-    currentParagraph = null;
-  }
-
-  for (const raw of lines) {
-    const line = raw.trimEnd();
-    if (line.startsWith('[') && line.endsWith(']')) {
-      flushParagraph();
-      const type = line.slice(1, -1).trim() || 'none';
-      currentParagraph = { type, lines: [] };
-      paragraphs.push(currentParagraph);
-      continue;
-    }
-    if (/^[a-zA-Z0-9_-]+:\s*.+/.test(line)) {
-      const idx = line.indexOf(':');
-      const key = line.slice(0, idx).trim();
-      const value = line.slice(idx + 1).trim();
-      meta[key] = value;
-      continue;
-    }
-    if (line === '') {
-      flushParagraph();
-      continue;
-    }
-    const parts = line.split('\t');
-    const chord = (parts[0] ?? '').trim();
-    const lyrics = (parts[1] ?? '').trim();
-    const pinyin = (parts[2] ?? '').trim();
-    currentLineSegments.push({ chord, lyrics, pinyin });
-  }
-  flushParagraph();
-
-  return { meta, paragraphs };
 }
