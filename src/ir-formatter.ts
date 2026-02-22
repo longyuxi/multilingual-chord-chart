@@ -32,18 +32,24 @@ export function displayWidth(s: string): number {
  * Then for each line we assign spaces so total spaces = round(totalWidth - totalContent),
  * and distribute per segment so the sum is exact (avoids cumulative rounding error).
  */
-function formatLine(segments: Segment[]): { chordLine: string; lyricsLine: string; pinyinLine: string | null } {
+function formatLine(segments: Segment[]): {
+  chordLine: string;
+  lyricsLine: string;
+  pinyinLine: string | null;
+  translationLine: string | null;
+} {
   if (segments.length === 0) {
-    return { chordLine: '', lyricsLine: '', pinyinLine: null };
+    return { chordLine: '', lyricsLine: '', pinyinLine: null, translationLine: null };
   }
   const contentWidths = segments.map((seg) => ({
     c: displayWidth(seg.chord ?? ''),
     l: displayWidth(seg.lyrics ?? ''),
     p: displayWidth(seg.pinyin ?? ''),
+    t: displayWidth(seg.translation ?? ''),
   }));
-  const segmentWidths = contentWidths.map(({ c, l, p }) => {
-    let w = Math.max(c, l, p, 1);
-    if (l === 0 && p === 0 && c > 0) w = Math.max(w, c + 1);
+  const segmentWidths = contentWidths.map(({ c, l, p, t }) => {
+    let w = Math.max(c, l, p, t, 1);
+    if (l === 0 && p === 0 && t === 0 && c > 0) w = Math.max(w, c + 1);
     return Math.ceil(w);
   });
   const totalWidth = segmentWidths.reduce((a, b) => a + b, 0);
@@ -70,12 +76,17 @@ function formatLine(segments: Segment[]): { chordLine: string; lyricsLine: strin
   const pinyinLine = hasPinyin
     ? lineFor((i) => segments[i].pinyin ?? '', (i) => contentWidths[i].p)
     : null;
-  return { chordLine, lyricsLine, pinyinLine };
+  const hasTranslation = segments.some((seg) => (seg.translation ?? '').trim() !== '');
+  const translationLine = hasTranslation
+    ? lineFor((i) => segments[i].translation ?? '', (i) => contentWidths[i].t)
+    : null;
+  return { chordLine, lyricsLine, pinyinLine, translationLine };
 }
 
 /**
  * Convert IR to chord tab string. Section headers [Verse 1], [Chorus], etc.;
- * for each lyric line: chord line, pinyin line (if any), lyrics line (Chinese); blank lines between sections.
+ * for each lyric line: chord line, pinyin line (if any), lyrics line (Chinese), translation line (if any non-empty); blank lines between sections.
+ * Translation line is omitted when every segment's translation is empty.
  */
 export function irToTabString(ir: Ir): string {
   const out: string[] = [];
@@ -96,12 +107,15 @@ export function irToTabString(ir: Ir): string {
         continue;
       }
 
-      const { chordLine, lyricsLine, pinyinLine } = formatLine(segments);
+      const { chordLine, lyricsLine, pinyinLine, translationLine } = formatLine(segments);
       out.push(chordLine.trimEnd());
       if (pinyinLine !== null) {
         out.push(pinyinLine.trimEnd());
       }
       out.push(lyricsLine.trimEnd());
+      if (translationLine !== null) {
+        out.push(translationLine.trimEnd());
+      }
     }
 
     if (p < ir.paragraphs.length - 1) {

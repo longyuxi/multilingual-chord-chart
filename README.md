@@ -48,7 +48,8 @@ npm run roundtrip -- convert/jrayty-in.txt convert/jrayty-roundtrip.txt
 
 ## IR format (JSON)
 
-`{ "meta": {}, "paragraphs": [ { "type": "verse"|"chorus"|…, "lines": [ { "segments": [ { "chord", "lyrics", "pinyin" } ] } ] } ] }`
+`{ "meta": {}, "paragraphs": [ { "type": "verse"|"chorus"|…, "lines": [ { "segments": [ { "chord", "lyrics", "pinyin" } ] } ] } ] }`  
+Full specification: [docs/ir-json-spec.md](docs/ir-json-spec.md)
 
 ## Agent workflow
 
@@ -58,4 +59,6 @@ npm run roundtrip -- convert/jrayty-in.txt convert/jrayty-roundtrip.txt
 
 ## Docs
 
+- [IR JSON specification](docs/ir-json-spec.md)
+- [Fixed-width rendering (CJK alignment)](docs/fixed-width-rendering.md)
 - [ChordSheetJS](https://martijnversluis.github.io/ChordSheetJS/)

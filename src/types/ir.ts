@@ -7,6 +7,8 @@ export interface Segment {
   chord: string;
   lyrics: string;
   pinyin: string;
+  /** Optional translation (e.g. English). Omitted in rendered text when the line has no translation. */
+  translation?: string;
 }
 
 export interface IrLine {
