@@ -20,7 +20,7 @@ function main(): void {
   const content = fs.readFileSync(base, 'utf8');
   const parser = new (ChordSheetJS as unknown as { UltimateGuitarParser: new () => { parse: (s: string) => unknown } }).UltimateGuitarParser();
   const song = parser.parse(content) as Parameters<typeof songToIr>[0];
-  const ir = songToIr(song);
+  const ir = songToIr(song, { rawTabContent: content });
   const song2 = irToSong(ir);
   const formatter = new (ChordSheetJS as unknown as { ChordsOverWordsFormatter: new () => { format: (s: unknown) => string } }).ChordsOverWordsFormatter();
   const tab = formatter.format(song2);

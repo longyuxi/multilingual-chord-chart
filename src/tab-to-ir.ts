@@ -1,6 +1,9 @@
 /**
  * Parse an Ultimate Guitar chord tab file and output the IR (JSON and/or LM text).
- * Usage: node dist/tab-to-ir.js <input.txt> [output.ir.json] [--lm]
+ * Usage: node dist/tab-to-ir.js <input.txt> [output.ir.json] [--lm] [--pinyin]
+ *
+ * --pinyin  Treat the parsed line text as pinyin (IR pinyin field); lyrics stay empty.
+ *           Default: line text goes into lyrics.
  */
 
 import * as fs from 'fs';
@@ -11,12 +14,13 @@ import type { Ir } from './types/ir';
 
 function main(): void {
   const args = process.argv.slice(2).filter((a) => a !== '');
-  const rest = args.filter((a) => a !== '--lm');
+  const textAsPinyin = args.includes('--pinyin');
+  const rest = args.filter((a) => a !== '--lm' && a !== '--pinyin');
   const inputPath = rest[0];
   let outputPath = rest[1];
 
   if (!inputPath) {
-    console.error('Usage: node dist/tab-to-ir.js <input.txt> [output.ir.json] [--lm]');
+    console.error('Usage: node dist/tab-to-ir.js <input.txt> [output.ir.json] [--lm] [--pinyin]');
     process.exit(1);
   }
 
@@ -24,7 +28,7 @@ function main(): void {
   const content = fs.readFileSync(base, 'utf8');
   const parser = new (ChordSheetJS as unknown as { UltimateGuitarParser: new () => { parse: (s: string) => unknown } }).UltimateGuitarParser();
   const song = parser.parse(content) as Parameters<typeof songToIr>[0];
-  const ir: Ir = songToIr(song);
+  const ir: Ir = songToIr(song, { textAsPinyin, rawTabContent: content });
 
   const outDir = path.dirname(base);
   const inputBase = path.basename(base, path.extname(base));

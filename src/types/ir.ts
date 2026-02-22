@@ -26,6 +26,8 @@ export type ParagraphType =
 
 export interface IrParagraph {
   type: ParagraphType;
+  /** Section title as in the source, e.g. "Verse 1", "Intro". Used when writing tab. */
+  label?: string;
   lines: IrLine[];
 }
 

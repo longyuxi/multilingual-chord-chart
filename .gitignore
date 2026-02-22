@@ -23,6 +23,7 @@ Thumbs.db
 # .env
 # .env.local
 
-# working folders
+# joworking folders
 convert/
 example_good
+convert_workdir/
