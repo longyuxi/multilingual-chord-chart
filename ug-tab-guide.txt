@@ -1,0 +1,317 @@
+3. Chords formatting rules
+3.1. Formatting
+
+A. Chords lining  REQUIRED
+Chords should be specified above the lines of a text as they are to be played. Use N.C. if nothing is played on that line. When one chord with no changes appears more than once on successive lines - you can skip it. However, to prevent a big amount of a text without chords (for example, rap text), you need to add repeated chords at least on every fourth line.
+
+Am            C                      Dm
+Same bed, but it feels just a little bit bigger now
+G        G7            C            Em/B
+Our song on the radio, but it don't sound the same
+Am            C                      Dm
+When our friends talk about you all it does is just tear me
+G        G7            C            Em/B
+Cause my heart breaks a little when I hear your name
+Correct
+Chords are specified across entire lyrics
+
+Am               C                   Dm
+Same bed, but it feels just a little bit bigger now
+G        G7            C            Em/B
+Our song on the radio, but it don't sound the same
+ 
+When our friends talk about you all it does is just tear me
+ 
+Cause my heart breaks a little when I hear your name
+Incorrect
+Chords are missing in full or in part
+
+B. Timing  REQUIRED
+Place the chords according to the time they are to be played.
+
+Am               C                   Dm
+Same bed, but it feels just a little bit bigger now
+G               G7            C               Em/B
+Our song on the radio, but it don't sound the same
+Correct
+Chords are placed according to the time they are to be played
+
+Am C Dm
+Same bed, but it feels just a little bit bigger now
+G G7 C Em/B
+Our song on the radio, but it don't sound the same
+Incorrect
+Chords are not placed according to the time they are to be played
+
+C. Chords position  REQUIRED
+Chords are located ABOVE the text.
+
+Am               C                   Dm
+Same bed, but it feels just a little bit bigger now
+G               G7            C               Em/B
+Our song on the radio, but it don't sound the same
+Correct
+Chords are placed above the text
+
+[Am]Same bed, but [C]it feels just alittle [Dm]bit bigger now
+[G]Our song on the [G7]radio, but it [C]don't sound [Em/B]the same
+
+                    
+Incorrect
+Chords are placed inside the text
+
+D. Extra Empty Lines  RECOMMENDED
+Don't leave empty lines between lyrics and chords. This will make the tab more readable and accurate and help people scroll or print your tab more easily.
+
+
+Correct
+Chords are located right above the words
+
+
+                    
+Incorrect
+Extra empty lines between lyrics and chords.
+
+3.2 Chords and lyrics information
+
+A. Lyrics  REQUIRED
+Do not use references to song parts in the tab, always write the full text instead. This way users will not have to scroll back and forth through the tab to play it.
+
+[Verse 1]
+Am            C                      Dm
+Same bed, but it feels just a little bit bigger now
+G        G7            C            Em/B
+Our song on the radio, but it don't sound the same
+Am                    C                Dm
+When our friends talk about you all it does is just tear me
+G                        C
+Cause my heart breaks a little when I hear your name
+
+[Chorus 1]
+Em                 Am             Em
+It all just sounds like ooh, ooh, oooh, oooh
+Bb                 C/G
+Mmm too young, too dumb to realize
+
+[Verse 2]
+Am                C               Dm
+ My pride, my ego, my needs and my selfish ways
+G             G7           C           Em/B
+Caused a good strong woman like you to walk out my life
+Am                    C                   Dm
+Now I'll never, never get to clean up the mess I made ooh
+G                  C
+And that haunts me every time I close my eyes
+
+[Chorus 1]
+G                F          G           C
+That I should've bought you flowers and held your hand
+F           G                        C
+Shoulda gave you all my hours when I had the chance
+F                       G                    Am
+Take you to every party cause all you wanted to do was dance
+D7            F        Fm                     C
+Now my baby's dancing, but she's dancing with another man
+                    
+Correct
+All the lyrics are present
+
+[Verse 1]
+Am               C                   Dm
+Same bed, but it feels just a little bit bigger now
+G        G7            C            Em/B
+Our song on the radio, but it don't sound the same
+Am                    C                Dm
+When our friends talk about you all it does is just tear me
+G                       C
+Cause my heart breaks a little when I hear your name
+
+[Chorus 1]
+[Verse 2]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                    
+Incorrect
+Parts of the song are missing, referenced only
+
+B. Song parts  RECOMMENDED
+Song parts (intro, chorus, verse, solo, etc.) need to be marked. If a song is not parted into "chorus," "verse" - you don't need to indicate them. The part name is put into square brackets: [Intro].
+
+[Verse 1]
+Am            C                      Dm
+Same bed, but it feels just a little bit bigger now
+G        G7            C            Em/B
+Our song on the radio, but it don't sound the same
+Am                    C                Dm
+When our friends talk about you all it does is just tear me
+G                        C
+Cause my heart breaks a little when I hear your name
+
+[Chorus 1]
+Em                 Am             Em
+It all just sounds like ooh, ooh, oooh, oooh
+Bb                 C/G
+Mmm too young, too dumb to realize
+Correct
+Song parts are labeled and separated
+
+
+Am               C                   Dm
+Same bed, but it feels just a little bit bigger now
+G        G7            C            Em/B
+Our song on the radio, but it don't sound the same
+Am                    C                Dm
+When our friends talk about you all it does is just tear me
+G                       C
+Cause my heart breaks a little when I hear your name
+Em                 Am             Em
+It all just sounds like ooh, ooh, oooh, oooh
+Bb                 C/G
+Mmm too young, too dumb to realize
+
+                    
+Incorrect
+Parts are not marked and visually merge with one other
+
+C. Caps Lock  RECOMMENDED
+Lyrics shouldn't be written in all capitals, use proper capitalization.
+
+
+                    
+Correct
+Lyrics are written in proper capitalization
+
+
+                    
+Incorrect
+Lyrics are written all in caps
+
+3.3. Other
+
+A. Letter case  REQUIRED
+The first letter of a chord is capitalized, the rest are in lower case: Am, Dsus4 etc.
+
+Am               C                   Dm
+Same bed, but it feels just a little bit bigger now
+G               G7            C               Em/B
+Our song on the radio, but it don't sound the same
+Correct
+All chords start with a capital letter
+
+am               c                   dm
+Same bed, but it feels just a little bit bigger now
+g               g7            c               em/b
+Our song on the radio, but it don't sound the same
+Incorrect
+Chords begin with a lowercase letter
+
+B. Extra symbols  RECOMMENDED
+Do not add extra symbols or text in chord lines. If chord is to be played with any particular technique, add the description technique into the legend.
+
+Am               C                   Dm
+Same bed, but it feels just a little bit bigger now
+G               G7            C               Em/B
+Our song on the radio, but it don't sound the same
+************************************
+
+| *  strum once
+
+************************************
+Correct
+There are no unnecessary symbols in the chord lines, just the chords
+
+(Am*)---        (C*)---              (Dm*)
+Same bed, but it feels just a little bit bigger now
+(G)-----------(G7)----------------(C)-----------(Em/B)
+Our song on the radio, but it don't sound the same
+
+
+
+
+                    
+Incorrect
+The legend for the used symbols is missing
+
+C. "No chord"  RECOMMENDED
+N.C. notation is used the same way as a regular chord.
+
+[Verse 1]
+N.C.                                    A C F
+Some days I spend all day on the phone
+N.C.                                    A C F
+Other days I would just rather be alone
+N.C.                                                  A C F
+Some days I feel so insignificant like nothing even matters
+F           N.C.
+I’ve been caught under the radar so help me please
+Correct
+When you need to draw attention to the fact that there shouldn't be played anything at some particular moment, use the abbreviation "N.C."
+
+[Verse 1]
+                                        A C F
+Some days I spend all day on the phone
+                                        A C F
+Other days I would just rather be alone
+                                                      A C F
+Some days I feel so insignificant like nothing even matters
+F           
+I’ve been caught under the radar so help me please
+Incorrect
+There is a pause at the beginning of the line that is not specified in any way at all
+
+D. Fingering  RECOMMENDED
+If you want to specify a special chord variation, specify their fingerings in the beginning of the tab, by using the following template "chord name – fret number", and starting from the thickest string.
+
+Chords:
+Am 577555
+Em7 x79787
+Cmaj7 x-x-10-12-12-12
+Correct
+Chord names are specified, all the fingerings are present
+
+E. Indent the lyrics  RECOMMENDED
+Lyrics should be aligned along the left margin.
+
+
+                    
+Correct
+Lyrics are left-aligned
+
+
+                    
+Incorrect
+Lyrics with unnecessary indents
+
+F. Chord names  RECOMMENDED
+Use only common chord names and symbols. Otherwise, our algorithm will not recognize them, and users will not be able to see chord shapes in your tab. We don't accept any additional chord names.
+
+
+                    
+Correct
+The algorithm can identify common chord names that are used here
+
+
+                    
+Incorrect
+Uncommon and unfamiliar chord names are used that cannot be identified by the algorithm

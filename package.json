@@ -1,0 +1,19 @@
+{
+  "name": "tab-pinyinizer",
+  "version": "0.1.0",
+  "dependencies": {
+    "chordsheetjs": "^14.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.0",
+    "@types/node": "^20.10.0"
+  },
+  "scripts": {
+    "build": "tsc",
+    "tab-to-ir": "node dist/tab-to-ir.js",
+    "ir-to-tab": "node dist/ir-to-tab.js",
+    "roundtrip": "node dist/roundtrip.js",
+    "check-alignment": "node dist/check-alignment.js",
+    "parse-example": "node dist/parse-example.js"
+  }
+}
