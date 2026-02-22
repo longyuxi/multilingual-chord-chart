@@ -27,49 +27,48 @@ export function displayWidth(s: string): number {
   return w;
 }
 
-/** Pad string to target width (exact, fractional): add ceil(target - contentWidth) spaces. */
-function padToWidth(s: string, contentWidth: number, targetWidth: number): string {
-  if (contentWidth >= targetWidth) return s;
-  // Round the gap to avoid ceil(6.499999...) === 6 when we want 7 (e.g. 当天 → 7 spaces)
-  const gap = Math.round((targetWidth - contentWidth) * 100) / 100;
-  const n = Math.ceil(gap);
-  return s + ' '.repeat(n);
-}
-
+/**
+ * Segment width = ceil(max of content widths). Gives integer column boundaries.
+ * Then for each line we assign spaces so total spaces = round(totalWidth - totalContent),
+ * and distribute per segment so the sum is exact (avoids cumulative rounding error).
+ */
 function formatLine(segments: Segment[]): { chordLine: string; lyricsLine: string; pinyinLine: string | null } {
   if (segments.length === 0) {
     return { chordLine: '', lyricsLine: '', pinyinLine: null };
   }
-  const segmentTargets = segments.map((seg) => {
-    const c = displayWidth(seg.chord ?? '');
-    const l = displayWidth(seg.lyrics ?? '');
-    const p = displayWidth(seg.pinyin ?? '');
+  const contentWidths = segments.map((seg) => ({
+    c: displayWidth(seg.chord ?? ''),
+    l: displayWidth(seg.lyrics ?? ''),
+    p: displayWidth(seg.pinyin ?? ''),
+  }));
+  const segmentWidths = contentWidths.map(({ c, l, p }) => {
     let w = Math.max(c, l, p, 1);
     if (l === 0 && p === 0 && c > 0) w = Math.max(w, c + 1);
-    return { c, l, p, w };
+    return Math.ceil(w);
   });
-  // Emit chord line first; track emitted width per segment (chord + spaces, rounded up).
-  const emittedWidths: number[] = [];
-  const chordParts = segments.map((seg, i) => {
-    const { c, w } = segmentTargets[i];
-    const n = Math.ceil(w - c);
-    const emitted = c + n;
-    emittedWidths.push(emitted);
-    return (seg.chord ?? '') + ' '.repeat(n);
-  });
-  const chordLine = chordParts.join('');
-  const lyricsLine = segments.map((seg, i) => {
-    const l = segmentTargets[i].l;
-    const e = emittedWidths[i];
-    return padToWidth(seg.lyrics ?? '', l, e);
-  }).join('');
+  const totalWidth = segmentWidths.reduce((a, b) => a + b, 0);
+
+  function lineFor(getContent: (i: number) => string, getContentWidth: (i: number) => number): string {
+    const contentW = segmentWidths.map((_, i) => getContentWidth(i));
+    const totalContent = contentW.reduce((a, b) => a + b, 0);
+    const totalSpacesNeeded = Math.round(Math.round((totalWidth - totalContent) * 100) / 100);
+    const idealSpaces = segmentWidths.map((W, i) => W - contentW[i]);
+    const spaceCounts: number[] = [];
+    let sum = 0;
+    for (let i = 0; i < segments.length - 1; i++) {
+      const n = Math.round(Math.round(idealSpaces[i] * 100) / 100);
+      spaceCounts.push(n);
+      sum += n;
+    }
+    spaceCounts.push(Math.max(0, totalSpacesNeeded - sum));
+    return segments.map((seg, i) => getContent(i) + ' '.repeat(spaceCounts[i])).join('');
+  }
+
+  const chordLine = lineFor((i) => segments[i].chord ?? '', (i) => contentWidths[i].c);
+  const lyricsLine = lineFor((i) => segments[i].lyrics ?? '', (i) => contentWidths[i].l);
   const hasPinyin = segments.some((seg) => (seg.pinyin ?? '').trim() !== '');
   const pinyinLine = hasPinyin
-    ? segments.map((seg, i) => {
-        const p = segmentTargets[i].p;
-        const e = emittedWidths[i];
-        return padToWidth(seg.pinyin ?? '', p, e);
-      }).join('')
+    ? lineFor((i) => segments[i].pinyin ?? '', (i) => contentWidths[i].p)
     : null;
   return { chordLine, lyricsLine, pinyinLine };
 }
