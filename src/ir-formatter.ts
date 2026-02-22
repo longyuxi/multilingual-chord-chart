@@ -91,38 +91,28 @@ function formatLine(segments: Segment[]): {
 export function irToTabString(ir: Ir): string {
   const out: string[] = [];
 
-  for (let p = 0; p < ir.paragraphs.length; p++) {
-    const para = ir.paragraphs[p];
-
-    // Section header: only when label is non-empty
+  for (const para of ir.paragraphs) {
     const labelStr = para.label != null ? String(para.label).trim() : '';
+
+    // Blank line before every section title (but not at the very start of the file)
+    if (labelStr !== '' && out.length > 0) {
+      out.push('');
+    }
     if (labelStr !== '') {
       out.push(`[${labelStr}]`);
-      out.push('');
     }
 
     for (const irLine of para.lines) {
       const segments = irLine.segments ?? [];
-      if (segments.length === 0) {
-        out.push('');
-        continue;
-      }
+      if (segments.length === 0) continue;
 
       const { chordLine, lyricsLine, pinyinLine, translationLine } = formatLine(segments);
-      out.push(chordLine.trimEnd());
-      if (pinyinLine !== null) {
-        out.push(pinyinLine.trimEnd());
-      }
-      out.push(lyricsLine.trimEnd());
-      if (translationLine !== null) {
-        out.push(translationLine.trimEnd());
-      }
-    }
-
-    if (p < ir.paragraphs.length - 1) {
-      out.push('');
+      if (chordLine.trimEnd()) out.push(chordLine.trimEnd());
+      if (pinyinLine !== null) out.push(pinyinLine.trimEnd());
+      if (lyricsLine.trimEnd()) out.push(lyricsLine.trimEnd());
+      if (translationLine !== null && translationLine.trimEnd()) out.push(translationLine.trimEnd());
     }
   }
 
-  return out.join('\n').replace(/\n{3,}/g, '\n\n') + '\n';
+  return out.join('\n') + '\n';
 }

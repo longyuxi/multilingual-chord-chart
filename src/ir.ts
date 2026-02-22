@@ -74,7 +74,7 @@ export function songToIr(
           const text = item.lyrics != null ? String(item.lyrics) : '';
           const lyrics = textAsPinyin ? '' : text;
           const pinyin = textAsPinyin ? text : '';
-          segments.push({ chord, lyrics, pinyin });
+          segments.push({ chord, lyrics, pinyin, translation: '' });
         }
       }
       lines.push({ segments });
