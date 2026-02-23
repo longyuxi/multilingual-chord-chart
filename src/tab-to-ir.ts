@@ -15,7 +15,8 @@ import type { Ir } from './types/ir';
 function main(): void {
   const args = process.argv.slice(2).filter((a) => a !== '');
   const textAsPinyin = args.includes('--pinyin');
-  const rest = args.filter((a) => a !== '--pinyin');
+  const bothPinyinAndLyrics = args.includes('--both');
+  const rest = args.filter((a) => a !== '--pinyin' && a !== '--both');
   const inputPath = rest[0];
   let outputPath = rest[1];
 
@@ -28,7 +29,7 @@ function main(): void {
   const content = fs.readFileSync(base, 'utf8');
   const parser = new (ChordSheetJS as unknown as { UltimateGuitarParser: new () => { parse: (s: string) => unknown } }).UltimateGuitarParser();
   const song = parser.parse(content) as Parameters<typeof songToIr>[0];
-  const ir: Ir = songToIr(song, { textAsPinyin, rawTabContent: content });
+  const ir: Ir = songToIr(song, { textAsPinyin, bothPinyinAndLyrics, rawTabContent: content });
 
   const outDir = path.dirname(base);
   const inputBase = path.basename(base, path.extname(base));

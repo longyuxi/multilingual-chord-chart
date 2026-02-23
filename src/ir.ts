@@ -4,7 +4,57 @@
  */
 
 import ChordSheetJS from 'chordsheetjs';
+import wcwidth = require('wcwidth');
 import type { Ir, IrLine, IrParagraph, Segment } from './types/ir';
+
+const CJK_COL_WIDTH = 5 / 3;
+
+/** Display width of a single character (CJK = 5/3, Latin = 1, combining = 0). */
+function charColWidth(ch: string): number {
+  const wc = wcwidth(ch);
+  return wc <= 0 ? 0 : wc === 2 ? CJK_COL_WIDTH : 1;
+}
+
+/** Display width of a string using CJK = 5/3 weighting. */
+function strColWidth(s: string): number {
+  if (!s) return 0;
+  let w = 0;
+  for (const ch of s) w += charColWidth(ch);
+  return w;
+}
+
+/** True if the string contains any CJK (double-width) character. */
+function hasCJK(s: string): boolean {
+  for (const ch of s) if (wcwidth(ch) === 2) return true;
+  return false;
+}
+
+/**
+ * Split `text` across `segWidths.length` buckets using cumulative column-width boundaries.
+ * Characters are assigned to the current bucket until the running column position reaches
+ * the next boundary, then spill into the next bucket.
+ */
+function splitByCumulativeWidths(text: string, segWidths: number[]): string[] {
+  if (segWidths.length === 0) return [];
+  if (segWidths.length === 1) return [text];
+  const result: string[] = Array(segWidths.length).fill('');
+  // Compute cumulative boundaries (one per internal boundary)
+  const boundaries: number[] = [];
+  let cum = 0;
+  for (let i = 0; i < segWidths.length - 1; i++) {
+    cum += segWidths[i];
+    boundaries.push(cum);
+  }
+  let col = 0;
+  let si = 0;
+  for (const ch of text) {
+    // Advance past any boundary we have already reached
+    while (si < boundaries.length && col >= boundaries[si]) si++;
+    result[si] += ch;
+    col += charColWidth(ch);
+  }
+  return result;
+}
 
 /** ChordSheetJS paragraph type for lines we emit (IR has no type, we use a default). */
 const DEFAULT_CHORDSHEET_LINE_TYPE = (ChordSheetJS as unknown as { VERSE: string }).VERSE ?? 'verse';
@@ -24,6 +74,12 @@ export interface SongToIrOptions {
   /** If true, put parsed line text into pinyin and leave lyrics empty. Default: false (text → lyrics). */
   textAsPinyin?: boolean;
   /**
+   * If true, parse both pinyin and Chinese lyrics simultaneously.
+   * ChordSheetJS pairs chord+pinyin; the following CJK-only line is distributed as lyrics
+   * across the preceding line's segments using column-width splitting.
+   */
+  bothPinyinAndLyrics?: boolean;
+  /**
    * Raw tab file content. When set, section titles are extracted from lines like [Verse 1], [Chorus],
    * and assigned to paragraphs in order (so round-trip preserves [Verse 1] etc.).
    */
@@ -38,7 +94,9 @@ export function songToIr(
   song: { metadata?: Record<string, unknown>; bodyParagraphs?: Array<{ type?: string; lines?: Array<{ items?: Array<{ chords?: string; lyrics?: string }> }> }> },
   options?: SongToIrOptions
 ): Ir {
-  const textAsPinyin = options?.textAsPinyin ?? false;
+  const bothPinyinAndLyrics = options?.bothPinyinAndLyrics ?? false;
+  // In --both mode text from ChordSheetJS items goes to pinyin first; CJK lines are reclassified below.
+  const textAsPinyin = (options?.textAsPinyin ?? false) || bothPinyinAndLyrics;
   const rawTabContent = options?.rawTabContent;
   const sectionLabelsFromRaw: string[] = [];
   if (rawTabContent) {
@@ -78,6 +136,43 @@ export function songToIr(
         }
       }
       lines.push({ segments });
+    }
+
+    // --both mode: CJK-only lines (no chords, text contains double-width chars) are merged as
+    // lyrics into the preceding chord+pinyin line by splitting on column-width boundaries.
+    // Standalone CJK lines with no preceding chord line (e.g. Chinese title) are reclassified
+    // from pinyin → lyrics in place.
+    if (bothPinyinAndLyrics) {
+      const merged: IrLine[] = [];
+      for (const irLine of lines) {
+        const lineText = irLine.segments.map((s) => s.pinyin ?? '').join('');
+        const allChordsEmpty = irLine.segments.every((s) => !(s.chord ?? ''));
+        if (allChordsEmpty && hasCJK(lineText)) {
+          const prev = merged.length > 0 ? merged[merged.length - 1] : null;
+          const prevHasContent =
+            prev !== null &&
+            prev.segments.some((s) => (s.chord ?? '') || (s.pinyin ?? '').trim());
+          if (prevHasContent && prev) {
+            // Distribute Chinese characters across the previous line's segments
+            const widths = prev.segments.map((s) =>
+              Math.ceil(Math.max(strColWidth(s.chord ?? ''), strColWidth(s.pinyin ?? ''), 1))
+            );
+            const splits = splitByCumulativeWidths(lineText, widths);
+            prev.segments.forEach((seg, i) => {
+              seg.lyrics = (splits[i] ?? '').trimEnd();
+            });
+            continue; // consumed; do not add as its own IrLine
+          }
+          // No preceding chord+pinyin line — reclassify as lyrics
+          irLine.segments.forEach((seg) => {
+            seg.lyrics = seg.pinyin ?? '';
+            seg.pinyin = '';
+          });
+        }
+        merged.push(irLine);
+      }
+      lines.length = 0;
+      merged.forEach((l) => lines.push(l));
     }
 
     const allText = lines.map((l) => l.segments.map((s) => (textAsPinyin ? s.pinyin : s.lyrics)).join('')).join('').trim();
