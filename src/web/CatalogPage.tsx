@@ -23,7 +23,11 @@ export default function CatalogPage({ songs, onSelect }: Props) {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {songs.map(song => (
+            {[...songs].sort((a, b) => {
+              const artist = (a.meta.artist ?? '').localeCompare(b.meta.artist ?? '');
+              if (artist !== 0) return artist;
+              return (a.meta.title ?? '').localeCompare(b.meta.title ?? '');
+            }).map(song => (
               <tr
                 key={song.id}
                 onClick={() => onSelect(song)}
