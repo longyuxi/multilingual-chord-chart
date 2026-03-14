@@ -3,18 +3,28 @@
   "version": "0.1.0",
   "dependencies": {
     "chordsheetjs": "^14.0.0",
+    "react": "^18.3.0",
+    "react-dom": "^18.3.0",
     "wcwidth": "^1.0.1"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",
-    "typescript": "^5.3.0"
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.0",
+    "typescript": "^5.3.0",
+    "vite": "^6.0.0"
   },
   "scripts": {
-    "build": "tsc",
+    "dev": "vite",
+    "build:web": "vite build",
+    "preview": "vite preview",
+    "build:cli": "tsc",
     "tab-to-ir": "node dist/tab-to-ir.js",
     "ir-to-tab": "node dist/ir-to-tab.js",
     "roundtrip": "node dist/roundtrip.js",
     "check-alignment": "node dist/check-alignment.js",
-    "parse-example": "node dist/parse-example.js"
+    "parse-example": "node dist/parse-example.js",
+    "ug-to-html": "node dist/ug-to-html.js"
   }
 }

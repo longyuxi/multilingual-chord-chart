@@ -1,0 +1,79 @@
+% The extended chord bracket format:
+% Uses extension .ecb
+
+% Lines that start with one percentage sign are comments.
+% Lines that start with two percentage signs are configuration specifications and should be specified only once at the top of the file, before any lyrics.
+
+% Lyric segments are notated [chord]lyric_1|lyric_2|...|lyric_n
+% where the vertical separators are for separating the different languages.
+% Each lyric in the lyric segment will be stripped of trailing and beginning white space.
+% For example, [Am]在你的怀里|zai ni de huai li, which is equivalent to [Am] 在你的怀里 | zai ni de huai li
+% A lyric segment is allowed to have no chord symbol, e.g. []some lyrics|some other translation
+% A lyric segment is also allowed to have no lyric but only a chord. This is called an empty lyric segment and could be useful for instrumental sections. e.g. [Am][Dm][G][Cmaj7]. In this case, the only thing that is allowed to follow a chord symbol is either another chord symbol or a new line character (after stripping whitespace).
+% A line is allowed to have multiple lyric segments.
+
+% The language for each lyric is specified using the languages configuration parameter (comma separated, leading and trailing whitespaces stripped). For example, the languages configuration parameters for the above should be
+% %%languages chinese, pinyin
+% A non-empty lyric segment should have as many languages as this parameter specifies.
+
+% Additional configuration options may be set and will be saved as metadata for the downstream application.
+% For example, %%title, %%subtitle, %%artist, %%artist_subtitle
+
+% Section titles are notated in angle brackets. e.g. <Introduction>
+% A section is allowed to have no content.
+
+% Finally, we are allowed to have free text by using the right angle to start a line. e.g. (without the commenting percentage signs)
+% > This is an example of free text
+% > Free text can extend multiple lines. Just put another right angle bracket in front.
+
+% For example, here is a version of When You Are Old by Li Jian with Chinese and pinyin.
+
+%%languages chinese, pinyin
+> Original Key is E, transcribed in C.
+> Capo=4
+
+<intro>
+[Fmaj7][G][Em][A][Dm7][G6][C][C]
+
+<verse 1>
+[]当你|dang ni [C]老了 头发|lao le tou fa [Em]白了 睡|bai le shui
+[Fsus2]意 昏|yi hun [G]沉 当你|chen dang ni [C]老了 走不|lao le zou bu
+[Em]动了 炉火旁|dong le lu huo pang [Fsus2]取暖 回忆|qu nuan hui yi [G]青春|qing chun
+
+<chorus>
+[Am]多少人|duo shao ren [Em]曾爱你青春|ceng ai ni qing chun [Fsus2]欢畅的|huan chang de [C]时辰|shi chen
+[Dm7]爱慕你的美|ai mu ni de mei [G]丽 假意或|li jia yi huo [C]真心|zhen xin [Cmaj7]
+[Am]只有一个|zhi you yi ge [Em]人还爱你|ren hai ai ni [Fsus2]虔诚的灵|qian cheng de ling [Am]魂 爱|hun ai
+[Dm7]你苍老的|ni cang lao de [G]脸上的|lian shang de [C]皱纹|zhou wen
+
+<verse 2>
+[]当你|dang ni [C]老了 眼眉|lao le yan mei
+[Em]低垂|di chui [Fsus2]灯火昏|deng huo hun [G]黄不|huang bu [C]定 风吹|ding feng chui
+[Am]过来你的|guo lai ni de [Em]消息 这|xiao xi zhe [Fsus2]就是|jiu shi [G]我心里的|wo xin li de
+[C]歌|ge
+
+<chorus>
+[Am]多少人曾|duo shao ren ceng [Em]爱你青春|ai ni qing chun [Fsus2]欢畅的时|huan chang de shi [C]辰|chen
+[]爱|ai [Dm7]慕你的美|mu ni de mei [G]丽 假意或|li jia yi huo [C]真心|zhen xin [Cmaj7]
+[Am]只有一个|zhi you yi ge [Em]人还爱你|ren hai ai ni [Fsus2]虔诚的灵|qian cheng de ling [Am]魂|hun
+[]爱|ai [Dm7]你苍老的脸上的|ni cang lao de lian shang de [G]皱纹|zhou wen
+
+<bridge>
+[C]我留不住所有|wo liu bu zhu suo you [Em]的岁月|de sui yue
+[Fsus2]岁 月却留住|sui yue que liu zhu [G]我|wo
+[C]不曾为我停留|bu ceng wei wo ting liu [F]的芬|de fen [C]芳|fang
+[Dm7]却|que [D#/F]是|shi [G]我的春|wo de chun [G]天|tian
+
+<chorus>
+[Am]多少人曾|duo shao ren ceng [Em]爱你青春|ai ni qing chun [F]欢畅的时|huan chang de shi [C]辰|chen
+[]爱|ai [Dm7]慕你的|mu ni de [Dm7]美丽|mei li [G]假意或|jia yi huo [C]真心|zhen xin [C7]
+[Am]只有一个|zhi you yi ge [Em]人还爱你|ren hai ai ni [Fsus2]虔诚的灵|qian cheng de ling [Am]魂|hun
+[]爱|ai [Dm7]你苍老的脸上的|ni cang lao de lian shang de [G]皱纹|zhou wen
+
+<verse 3>
+[]当你|dang ni [C]老了 眼眉|lao le yan mei [Em]低垂 灯|di chui deng [Fsus2]火 昏|huo hun [G]黄不|huang bu
+[C]定 风吹|ding feng chui [Am]过来你的|guo lai ni de [Em]消息 这|xiao xi zhe
+[Fsus2]就 是|jiu shi [G]我心里的|wo xin li de [C]歌|ge
+[]当我|dang wo [C]老了 我要|lao le wo yao
+[Em]为你|wei ni [Fsus2]唱|chang [G]起 这|qi zhe [C]首心里的|shou xin li de [C]歌|ge
+[]唱|chang [F]起 这|qi zhe [G]首心里的|shou xin li de [Fm/C]歌|ge [C]

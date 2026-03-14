@@ -48,8 +48,10 @@ function splitByCumulativeWidths(text: string, segWidths: number[]): string[] {
   let col = 0;
   let si = 0;
   for (const ch of text) {
-    // Advance past any boundary we have already reached
-    while (si < boundaries.length && col >= boundaries[si]) si++;
+    // Compare in 1/3-unit integers to avoid floating-point drift from repeated 5/3 additions.
+    // All valid column positions are multiples of 1/3 (CJK = 5/3, Latin = 3/3), so
+    // Math.round(col * 3) is always exact, matching the ceil-based integer segment widths.
+    while (si < boundaries.length && Math.round(col * 3) >= boundaries[si] * 3) si++;
     result[si] += ch;
     col += charColWidth(ch);
   }
