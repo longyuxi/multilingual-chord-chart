@@ -2,9 +2,11 @@
   "name": "tab-pinyinizer",
   "version": "0.1.0",
   "dependencies": {
+    "@tailwindcss/vite": "^4.2.1",
     "chordsheetjs": "^14.0.0",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
+    "tailwindcss": "^4.2.1",
     "wcwidth": "^1.0.1"
   },
   "devDependencies": {

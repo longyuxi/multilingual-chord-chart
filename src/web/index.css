@@ -1,0 +1,7 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand: oklch(55% 0.22 260);
+  --color-brand-light: oklch(95% 0.05 260);
+  --font-mono: "JetBrains Mono", "Fira Code", ui-monospace, monospace;
+}

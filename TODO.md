@@ -3,22 +3,25 @@ Design
 
 Plan
 1. Implement the final website.
-    - First, perhaps refactor the format parsers into a folder.
-    - Make it on Figma.
-    - Implement based on the Figma design.
+    - First, maybe refactor the format parsers into a folder.
+    - This is a website that hosts chords and lyrics for my own view. The format that the website reads in is through the ECB format.
+    - This website should have two pages:
+        1. The first page is a catalog of all the music available, with their title and artist name.
+        2. After clicking into a segment, we can see the music in free text (the Music View).
+    - We will implement the exact details of Music View later. For now, let's just work on the catalog page, which will lead to a free text view of the music.
 
 
-Other thoughts (don't implement these):
-I want to build a website that hosts these things.
-
-1. An OCR system that OCR's a Muse 2.7 sheet and produces lyrics and chords
-2. An intermediate format to notate pinyin (already done)
+Other thoughts (just a scratch pad):
 3. A website to host these
-    - Need to use some css bbox alignment
     - Or just use a chinese font with a known em size. Easy enough.
         - Need to include features:
             - Allowing to transpose
-        - Main extra feature:
-            - I have more control over it
-            - Allow me to notate song names in both English and Chinese
-            - Keep a persistent numbering of the songs
+            - Maybe allow over zoom
+            - Keep a persistent numbering of the songs (maybe I should specify this at the top of an ECB file as a configuration parameter.)
+
+2. Maybe have a converter of this format into the ultimate guitar format.
+    - Probably not that important since I will be using my own website after this is done anyway.
+
+
+Distant ideas, probably not that important:
+1. An OCR system that OCR's a Muse 2.7 sheet and produces lyrics and chords
