@@ -1,13 +1,14 @@
 import React, { useState, useMemo } from 'react';
 import { Song } from './songs';
 import { parseEcbBlocks, EcbBlock } from './ecb-viewer-parser';
+import { transposeChord } from './chord-transposer';
 
 type Props = {
   song: Song;
   onBack: () => void;
 };
 
-function renderBlock(block: EcbBlock, idx: number, enabledLangs: Set<number>): React.ReactNode {
+function renderBlock(block: EcbBlock, idx: number, enabledLangs: Set<number>, transpose: number): React.ReactNode {
   switch (block.kind) {
     case 'config_table':
       return (
@@ -55,7 +56,6 @@ function renderBlock(block: EcbBlock, idx: number, enabledLangs: Set<number>): R
 
     case 'lyric_line': {
       const numLangs = Math.max(0, ...block.segments.map(s => s.lyrics.length));
-      // Show a language row only if it's enabled AND at least one segment has content
       const showLang = Array.from({ length: numLangs }, (_, j) =>
         enabledLangs.has(j) && block.segments.some(seg => (seg.lyrics[j] ?? '') !== '')
       );
@@ -63,18 +63,21 @@ function renderBlock(block: EcbBlock, idx: number, enabledLangs: Set<number>): R
         <table key={idx} className="border-collapse my-2">
           <tbody>
             <tr className="align-top">
-              {block.segments.map((seg, i) => (
-                <td key={i} className="pr-3 align-top whitespace-nowrap">
-                  <div className="text-sky-600 font-mono text-xs font-semibold min-h-[1.1em]">
-                    {seg.chord}
-                  </div>
-                  {showLang.map((show, j) => show ? (
-                    <div key={j} className="font-mono text-sm min-h-[1.3em] text-gray-700">
-                      {seg.lyrics[j] ?? ''}
+              {block.segments.map((seg, i) => {
+                const { text: chordText, valid } = transposeChord(seg.chord, transpose);
+                return (
+                  <td key={i} className="pr-3 align-top whitespace-nowrap">
+                    <div className={`font-mono text-xs font-semibold min-h-[1.1em] ${valid ? 'text-sky-600' : 'text-red-500'}`}>
+                      {chordText}
                     </div>
-                  ) : null)}
-                </td>
-              ))}
+                    {showLang.map((show, j) => show ? (
+                      <div key={j} className="font-mono text-sm min-h-[1.3em] text-gray-700">
+                        {seg.lyrics[j] ?? ''}
+                      </div>
+                    ) : null)}
+                  </td>
+                );
+              })}
             </tr>
           </tbody>
         </table>
@@ -93,14 +96,29 @@ function getLanguageNames(blocks: EcbBlock[]): string[] {
   return [];
 }
 
+function getConfigTranspose(blocks: EcbBlock[]): number | null {
+  for (const block of blocks) {
+    if (block.kind === 'config_table') {
+      const entry = block.entries.find(e => e.key === 'transpose');
+      if (entry) {
+        const n = parseInt(entry.value, 10);
+        return isNaN(n) ? null : n;
+      }
+    }
+  }
+  return null;
+}
+
 export default function MusicView({ song, onBack }: Props) {
   const blocks = useMemo(() => parseEcbBlocks(song.raw), [song.raw]);
   const languages = useMemo(() => getLanguageNames(blocks), [blocks]);
+  const configTranspose = useMemo(() => getConfigTranspose(blocks), [blocks]);
 
   const [showSource, setShowSource] = useState(false);
   const [enabledLangs, setEnabledLangs] = useState<Set<number>>(
     () => new Set(languages.map((_, i) => i))
   );
+  const [transpose, setTranspose] = useState(0);
 
   function toggleLang(i: number) {
     setEnabledLangs(prev => {
@@ -126,6 +144,45 @@ export default function MusicView({ song, onBack }: Props) {
             <p className="text-sm text-gray-700">{song.meta.artist}</p>
           )}
         </div>
+
+        {/* Transpose control */}
+        <div className="flex flex-col items-center gap-1">
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setTranspose(t => t - 1)}
+              className="w-7 h-7 flex items-center justify-center rounded text-gray-500 hover:bg-gray-100 hover:text-black transition-colors text-base leading-none"
+            >
+              −
+            </button>
+            <span className="w-8 text-center text-sm font-mono text-gray-700 select-none">
+              {transpose > 0 ? `+${transpose}` : transpose}
+            </span>
+            <button
+              onClick={() => setTranspose(t => t + 1)}
+              className="w-7 h-7 flex items-center justify-center rounded text-gray-500 hover:bg-gray-100 hover:text-black transition-colors text-base leading-none"
+            >
+              +
+            </button>
+          </div>
+          {configTranspose !== null && (
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setTranspose(0)}
+                className={`px-2 py-0.5 rounded text-xs transition-colors ${transpose === 0 ? 'bg-gray-200 text-gray-800 font-medium' : 'text-gray-400 hover:text-gray-700 hover:bg-gray-100'}`}
+              >
+                Transcribed
+              </button>
+              <button
+                onClick={() => setTranspose(configTranspose)}
+                className={`px-2 py-0.5 rounded text-xs transition-colors ${transpose === configTranspose ? 'bg-gray-200 text-gray-800 font-medium' : 'text-gray-400 hover:text-gray-700 hover:bg-gray-100'}`}
+              >
+                Actual
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Language toggles */}
         {languages.length > 0 && (
           <div className="flex items-center gap-2">
             {languages.map((lang, i) => (
@@ -146,7 +203,7 @@ export default function MusicView({ song, onBack }: Props) {
       </header>
 
       <main className="mx-auto max-w-3xl px-6 py-8">
-        {blocks.map((block, idx) => renderBlock(block, idx, enabledLangs))}
+        {blocks.map((block, idx) => renderBlock(block, idx, enabledLangs, transpose))}
 
         <div className="mt-12 border-t border-gray-200 pt-6">
           <button
