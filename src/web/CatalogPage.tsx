@@ -10,7 +10,7 @@ export default function CatalogPage({ songs, onSelect }: Props) {
   return (
     <div className="min-h-screen bg-white text-black">
       <header className="border-b border-gray-200 px-6 py-5">
-        <h1 className="text-2xl font-bold tracking-tight">Bilingual Chord Charts</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Multilingual Chord Charts</h1>
         <p className="mt-1 text-sm text-gray-500">Synchronized views for Chinese lyrics, pinyin, and English translations.</p>
       </header>
 
