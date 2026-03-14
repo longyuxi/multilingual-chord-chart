@@ -62,23 +62,31 @@ function renderBlock(block: EcbBlock, idx: number, enabledLangs: Set<number>, tr
       return (
         <table key={idx} className="border-collapse my-2">
           <tbody>
-            <tr className="align-top">
+            {/* Chord row */}
+            <tr>
               {block.segments.map((seg, i) => {
                 const { text: chordText, valid } = transposeChord(seg.chord, transpose);
                 return (
-                  <td key={i} className="pr-3 align-top whitespace-nowrap">
-                    <div className={`font-mono text-xs font-semibold min-h-[1.1em] ${valid ? 'text-sky-600' : 'text-red-500'}`}>
+                  <td key={i} className="pr-3 whitespace-nowrap">
+                    <div className={`font-mono text-sm font-semibold min-h-[1.1em] ${valid ? 'text-sky-600' : 'text-red-500'}`}>
                       {chordText}
                     </div>
-                    {showLang.map((show, j) => show ? (
-                      <div key={j} className="font-mono text-sm min-h-[1.3em] text-gray-700">
-                        {seg.lyrics[j] ?? ''}
-                      </div>
-                    ) : null)}
                   </td>
                 );
               })}
             </tr>
+            {/* One row per language */}
+            {showLang.map((show, j) => show ? (
+              <tr key={j} className="border-b border-gray-200">
+                {block.segments.map((seg, i) => (
+                  <td key={i} className="pr-3 whitespace-nowrap">
+                    <div className="font-mono text-sm min-h-[1.3em] text-gray-700">
+                      {seg.lyrics[j] ?? ''}
+                    </div>
+                  </td>
+                ))}
+              </tr>
+            ) : null)}
           </tbody>
         </table>
       );
@@ -228,9 +236,10 @@ export default function MusicView({ song, onBack }: Props) {
                     src={`https://www.youtube.com/embed/${youtubeId}`}
                     title="YouTube video player"
                     frameBorder="0"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                     referrerPolicy="strict-origin-when-cross-origin"
                     allowFullScreen
+                    loading="lazy"
                   />
                 </div>
               )}
