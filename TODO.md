@@ -3,12 +3,18 @@ Design
 
 Plan
 1. Implement the final website.
-    - First, maybe refactor the format parsers into a folder.
-    - This is a website that hosts chords and lyrics for my own view. The format that the website reads in is through the ECB format.
     - This website should have two pages:
         1. The first page is a catalog of all the music available, with their title and artist name.
         2. After clicking into a segment, we can see the music in free text (the Music View).
-    - We will implement the exact details of Music View later. For now, let's just work on the catalog page, which will lead to a free text view of the music.
+            - Visualize each part of the ECB file like this:
+                - Comments (starting with a single percentage sign and a space) should not be visualized.
+                - Config specifications (starting with two percentage signs with the key following) should be visualized in a table. Each specification should be seen as a column of that table, with the key in the top row and the value in the bottom row.
+                - Literal lines (lines that start with `>`) should be formatted just like regular text.
+                - Empty lines should be preserved.
+                - Section titles should be bolded and indented a little to the right.
+                - All parts of a non-empty lyric segment should be left aligned to each other. A way I have thought to accomplish this is to just have a table with empty boundaries for each lyric segment.
+                - For lyric segments with empty chords, the space of the chord should still be reserved so that this lyric segment will be aligned with the other lyric segments on the same line.
+                - For lyric segments with empty lyrics, the space of the empty lyrics should also be reserved.
 
 
 Other thoughts (just a scratch pad):
