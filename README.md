@@ -1,6 +1,6 @@
-# A Multilingual Chord Viewer
-
 ![Example Screenshot](imgs/example.png)
+
+# A Multilingual Chord Viewer
 
 **Ever need to practice singing in a language that your teacher doesn't speak in?**
 
