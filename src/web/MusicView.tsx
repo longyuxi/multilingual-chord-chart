@@ -96,6 +96,16 @@ function getLanguageNames(blocks: EcbBlock[]): string[] {
   return [];
 }
 
+function getYoutubeId(blocks: EcbBlock[]): string | null {
+  for (const block of blocks) {
+    if (block.kind === 'config_table') {
+      const entry = block.entries.find(e => e.key === 'youtube');
+      if (entry && entry.value) return entry.value.trim();
+    }
+  }
+  return null;
+}
+
 function getConfigTranspose(blocks: EcbBlock[]): number | null {
   for (const block of blocks) {
     if (block.kind === 'config_table') {
@@ -113,6 +123,7 @@ export default function MusicView({ song, onBack }: Props) {
   const blocks = useMemo(() => parseEcbBlocks(song.raw), [song.raw]);
   const languages = useMemo(() => getLanguageNames(blocks), [blocks]);
   const configTranspose = useMemo(() => getConfigTranspose(blocks), [blocks]);
+  const youtubeId = useMemo(() => getYoutubeId(blocks), [blocks]);
 
   const [showSource, setShowSource] = useState(false);
   const [enabledLangs, setEnabledLangs] = useState<Set<number>>(
@@ -203,7 +214,30 @@ export default function MusicView({ song, onBack }: Props) {
       </header>
 
       <main className="mx-auto max-w-3xl px-6 py-8">
-        {blocks.map((block, idx) => renderBlock(block, idx, enabledLangs, transpose))}
+        {(() => {
+          const splitIdx = blocks.findIndex(b => b.kind === 'config_table');
+          const before = splitIdx >= 0 ? blocks.slice(0, splitIdx + 1) : [];
+          const after  = splitIdx >= 0 ? blocks.slice(splitIdx + 1)    : blocks;
+          return (
+            <>
+              {before.map((block, idx) => renderBlock(block, idx, enabledLangs, transpose))}
+              {youtubeId && (
+                <div className="mb-6 w-4/5 mx-auto">
+                  <iframe
+                    className="w-full aspect-video rounded"
+                    src={`https://www.youtube.com/embed/${youtubeId}`}
+                    title="YouTube video player"
+                    frameBorder="0"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    referrerPolicy="strict-origin-when-cross-origin"
+                    allowFullScreen
+                  />
+                </div>
+              )}
+              {after.map((block, idx) => renderBlock(block, splitIdx + 1 + idx, enabledLangs, transpose))}
+            </>
+          );
+        })()}
 
         <div className="mt-12 border-t border-gray-200 pt-6">
           <button
