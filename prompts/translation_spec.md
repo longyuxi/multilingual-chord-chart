@@ -68,3 +68,5 @@
 [Am]就在某一|jiu zai mou yi|Then upon a [Dm]天|tian|day [G]你忽然出|ni hu ran chu|Suddenly you’re [C]现|xian|there
 [A]你清澈又|ni qing che you|Crystal clear and [Dm]神秘|shen mi|mystic [E]在贝加尔湖|zai bei jia er hu|Like the Lake of [Am]畔|pan|Baikal
 [A]你清澈又|ni qing che you|Crystal clear and [Dm]神秘|shen mi|mystic [E]像贝加尔湖|xiang bei jia er hu|Just like Lake of [Am]畔|pan|Baikal
+
+Now here's the ECB for the original song, and here is the translation. Output the ECB with translation incorporated. Wrap your outputs in triple backticks.
