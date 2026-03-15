@@ -37,5 +37,17 @@ export function transposeChord(chord: string, semitones: number): { text: string
 
   const idx = CHROMATIC.indexOf(parsed.pitch);
   const newIdx = ((idx + semitones) % 12 + 12) % 12;
-  return { text: CHROMATIC[newIdx] + parsed.quality, valid: true };
+
+  let quality = parsed.quality;
+  const slashMatch = quality.match(/^(.*\/)([A-G][#♯]?)(.*)$/);
+  if (slashMatch) {
+    const bassNote = slashMatch[2].replace('♯', '#');
+    if (CHROMATIC.includes(bassNote)) {
+      const bassIdx = CHROMATIC.indexOf(bassNote);
+      const newBassIdx = ((bassIdx + semitones) % 12 + 12) % 12;
+      quality = slashMatch[1] + CHROMATIC[newBassIdx] + slashMatch[3];
+    }
+  }
+
+  return { text: CHROMATIC[newIdx] + quality, valid: true };
 }

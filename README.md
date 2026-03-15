@@ -23,7 +23,11 @@ Each sound is noted in the extended chord bracket (ECB). See `format_spec/when_y
 [Am]在我的怀|zai wo de huai|Safe within my [Dm]里|li|arms [G]在你的眼|zai ni de yan|Deep within your [C]里|li|eyes
 ```
 
-Languages for the lyrics separated by the vertical bars are specified by a parameter in the header of the ECB file: `%%languages chinese, pinyin, english`.
+Languages for the lyrics are specified by a parameter in the header of the ECB file. For example:
+
+```
+%%languages chinese, pinyin, english
+```
 
 
 
