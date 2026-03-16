@@ -1,53 +1,11 @@
-const CHROMATIC = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-
-export type ParsedChord = {
-  valid: boolean;
-  pitch: string;   // e.g. "C#", "D", ""
-  quality: string; // e.g. "m", "maj7", "m9", ""
-};
-
-export function parseChord(chord: string): ParsedChord {
-  if (!chord.trim()) return { valid: true, pitch: '', quality: '' };
-
-  // First character must be A–G
-  if (!/^[A-G]/.test(chord)) return { valid: false, pitch: chord, quality: '' };
-
-  let pitch: string;
-  let quality: string;
-
-  if (chord.length >= 2 && (chord[1] === '#' || chord[1] === '♯')) {
-    pitch = chord[0] + '#';
-    quality = chord.slice(2);
-  } else {
-    pitch = chord[0];
-    quality = chord.slice(1);
-  }
-
-  if (!CHROMATIC.includes(pitch)) return { valid: false, pitch: chord, quality: '' };
-
-  return { valid: true, pitch, quality };
-}
+import { Chord } from 'chordsheetjs';
 
 export function transposeChord(chord: string, semitones: number): { text: string; valid: boolean } {
   if (!chord.trim()) return { text: chord, valid: true };
 
-  const parsed = parseChord(chord);
-  if (!parsed.valid) return { text: chord, valid: false };
-  if (!parsed.pitch) return { text: chord, valid: true };
+  const parsed = Chord.parse(chord);
+  if (!parsed) return { text: chord, valid: false };
+  if (semitones === 0) return { text: chord, valid: true };
 
-  const idx = CHROMATIC.indexOf(parsed.pitch);
-  const newIdx = ((idx + semitones) % 12 + 12) % 12;
-
-  let quality = parsed.quality;
-  const slashMatch = quality.match(/^(.*\/)([A-G][#♯]?)(.*)$/);
-  if (slashMatch) {
-    const bassNote = slashMatch[2].replace('♯', '#');
-    if (CHROMATIC.includes(bassNote)) {
-      const bassIdx = CHROMATIC.indexOf(bassNote);
-      const newBassIdx = ((bassIdx + semitones) % 12 + 12) % 12;
-      quality = slashMatch[1] + CHROMATIC[newBassIdx] + slashMatch[3];
-    }
-  }
-
-  return { text: CHROMATIC[newIdx] + quality, valid: true };
+  return { text: parsed.transpose(semitones).toString(), valid: true };
 }
