@@ -68,7 +68,7 @@ function renderBlock(block: EcbBlock, idx: number, enabledLangs: Set<number>, tr
                 const { text: chordText, valid } = transposeChord(seg.chord, transpose);
                 return (
                   <td key={i} className="pr-3 whitespace-nowrap">
-                    <div className={`font-mono text-sm font-semibold min-h-[1.1em] ${valid ? 'text-sky-600' : 'text-red-500'}`}>
+                    <div className={`font-sans text-sm font-semibold min-h-[1.1em] ${valid ? 'text-sky-600' : 'text-red-500'}`}>
                       {chordText}
                     </div>
                   </td>
@@ -80,7 +80,7 @@ function renderBlock(block: EcbBlock, idx: number, enabledLangs: Set<number>, tr
               <tr key={j} className="border-b border-gray-200">
                 {block.segments.map((seg, i) => (
                   <td key={i} className="pr-3 whitespace-nowrap">
-                    <div className="font-mono text-sm min-h-[1.3em] text-gray-700">
+                    <div className="font-sans text-sm min-h-[1.3em] text-gray-700">
                       {seg.lyrics[j] ?? ''}
                     </div>
                   </td>
