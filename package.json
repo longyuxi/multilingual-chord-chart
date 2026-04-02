@@ -27,6 +27,7 @@
     "roundtrip": "node dist/roundtrip.js",
     "check-alignment": "node dist/check-alignment.js",
     "parse-example": "node dist/parse-example.js",
-    "ug-to-html": "node dist/ug-to-html.js"
+    "ug-to-html": "node dist/ug-to-html.js",
+    "tab-to-ecb": "node dist/tab-to-ecb.js"
   }
 }
