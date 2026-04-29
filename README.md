@@ -2,9 +2,13 @@
 
 # A Multilingual Chord Viewer
 
-**Ever need to practice singing in a language that your teacher doesn't speak in?**
+Did you...
 
-The web app renders **multiple lyric tracks** with **aligned chord columns, language toggles, transposition, and optional YouTube embeds**. So now you can provide phonetic transcription and translations for your singing teacher.
+- Need to rehearse a song with someone who can’t read the lyrics’ language?
+- Try to study a song across a language barrier?
+- Wish your singing partner could follow along without speaking the language of the lyrics?
+
+Then fear not, Multilingual Chord Viewer is the solution for you. The web app renders **multiple lyric tracks** with **aligned chord columns, language toggles, transposition, and optional YouTube embeds**. So now you can provide phonetic transcription and translations for your singing teacher.
 
 
 ## Web App

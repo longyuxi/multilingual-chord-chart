@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm run tab-to-ir:*)",
+      "Bash(npm run ir-to-tab:*)",
+      "Bash(node:*)"
+    ]
+  }
+}

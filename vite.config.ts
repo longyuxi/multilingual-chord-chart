@@ -6,6 +6,7 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
     host: '0.0.0.0',
+    allowedHosts: ['yuxis-mac-mini'],
   },
   build: {
     outDir: 'dist-web',
