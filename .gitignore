@@ -3,6 +3,7 @@ node_modules/
 
 # TypeScript build output
 dist/
+dist-web
 
 # Logs and debug
 npm-debug.log*
