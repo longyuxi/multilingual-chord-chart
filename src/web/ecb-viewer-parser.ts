@@ -69,6 +69,15 @@ export function parseEcbBlocks(raw: string): EcbBlock[] {
     // Lyric line: contains [
     if (line.includes('[')) {
       const segments: EcbSegment[] = [];
+
+      // Capture leading text before the first bracket
+      const firstBracket = line.indexOf('[');
+      const leadingText = line.slice(0, firstBracket);
+      if (leadingText.trim() !== '') {
+        const lyrics = leadingText.trim().split('|').map(s => s.trim());
+        segments.push({ chord: '', lyrics });
+      }
+
       const re = /\[([^\]]*)\]([^\[]*)/g;
       let match: RegExpExecArray | null;
       while ((match = re.exec(line)) !== null) {
