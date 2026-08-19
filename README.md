@@ -49,62 +49,38 @@ Languages for the lyrics are specified by a parameter in the header of the ECB f
 <details>
 <summary>Legacy pipeline (deprecated)</summary>
 
-The original purpose of this repo was to add pinyin to Ultimate Guitar tabs using an LM via an intermediate JSON representation (IR).
-
-### Pipeline
-
-1. **Tab → IR** — Parse Ultimate Guitar tab with ChordSheetJS, emit IR (JSON).
-2. **Agent** — Edit the JSON: fill the `pinyin` field for each segment (e.g. with an agentic LM).
-3. **IR → Tab** — Convert IR back to chord tab (ChordSheetJS `ChordsOverWordsFormatter`).
+The original purpose of this repo was to add pinyin to Ultimate Guitar tabs. That workflow now converts an Ultimate Guitar tab straight to ECB in a single step — no separate JSON step, no manual editing pass.
 
 ### Setup
 
 ```bash
 npm install
-npm run build
+npm run build:cli
 ```
 
 Source is in `src/`, compiled output in `dist/`.
 
 ### Usage
 
-#### Tab → IR (JSON)
-
 ```bash
-npm run tab-to-ir -- convert/jrayty-in.txt
-# Writes convert/jrayty-in.ir.json
-
-npm run tab-to-ir -- convert/jrayty-in.txt out.ir.json
+npm run tab-to-ecb -- <input.txt> [output.ecb] [--pinyin] [--both]
 ```
 
-#### IR → Tab
+- With no flags, the tab's lyric text is parsed as the song's lyrics.
+- `--pinyin` — treat the tab's lyric text as pinyin instead (lyrics stay empty).
+- `--both` — parse both pinyin and Chinese simultaneously: chord+pinyin lines are paired by ChordSheetJS, with a following CJK-only line distributed as lyrics across segments.
+
+If `output.ecb` is omitted, the output is written next to the input file with a `.ecb` extension.
 
 ```bash
-npm run ir-to-tab -- convert/jrayty-in.ir.json
-npm run ir-to-tab -- convert/jrayty-in.ir.json converted.txt
+npm run tab-to-ecb -- convert/jrayty-in.txt
+# Writes convert/jrayty-in.ecb
+
+npm run tab-to-ecb -- convert/jrayty-in.txt out.ecb --both
 ```
-
-#### Round-trip (sanity check)
-
-```bash
-npm run roundtrip -- convert/jrayty-in.txt convert/jrayty-roundtrip.txt
-```
-
-### IR format (JSON)
-
-`{ "meta": {}, "paragraphs": [ { "type": "verse"|"chorus"|…, "lines": [ { "segments": [ { "chord", "lyrics", "pinyin" } ] } ] } ] }`
-
-Full specification: [docs/ir-json-spec.md](docs/ir-json-spec.md)
-
-### Agent workflow
-
-1. Run `npm run tab-to-ir -- your-song.txt` to get `your-song.ir.json`.
-2. Have your agent edit the JSON: set the `pinyin` field for each segment in `paragraphs[].lines[].segments[]`.
-3. Run `npm run ir-to-tab -- your-song.ir.json your-song-with-pinyin.txt`.
 
 ### Docs
 
-- [IR JSON specification](docs/ir-json-spec.md)
 - [Fixed-width rendering (CJK alignment)](docs/fixed-width-rendering.md)
 - [ChordSheetJS](https://martijnversluis.github.io/ChordSheetJS/)
 

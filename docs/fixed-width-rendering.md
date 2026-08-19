@@ -25,7 +25,7 @@ So:
 
 ## What we do in this project
 
-- The **ir-formatter** uses **column width** (via the same rules as `wcwidth`: Unicode East Asian Width) to decide how many spaces to add so that chord / lyrics / pinyin lines have the same total width **in a compliant environment** (e.g. terminal, or an editor with a font that follows 2:1).
+- `src/tab-to-ecb-core.ts` uses **column width** (via the same rules as `wcwidth`: Unicode East Asian Width, see its `charColWidth`/`strColWidth`/`splitByCumulativeWidths` helpers) to decide how to split and align chord / lyrics / pinyin segments so they line up on the same total width **in a compliant environment** (e.g. terminal, or an editor with a font that follows 2:1).
 - In **terminals** that use wcwidth-style logic, alignment should be correct.
 - In **VS Code / Ultimate Guitar**, alignment can still be off because the **font** decides the actual pixel width of each character; we only control the number of space characters, not the font metrics.
 

@@ -71,7 +71,7 @@ npm run build:cli  # tsc build of the legacy CLI pipeline (src/*.ts, excl. src/w
 
 There is no test runner, linter, or CI config in this repo — don't invent `npm test`/`npm run lint` commands. `npm run build:cli` (tsc, strict mode) is the closest thing to a correctness check for the non-web TypeScript, and `tsc -p tsconfig.web.json --noEmit` type-checks `src/web/` (no script wired up for it currently).
 
-The legacy CLI pipeline scripts (`tab-to-ir`, `ir-to-tab`, `roundtrip`, `check-alignment`, `parse-example`, `ug-to-html`, `tab-to-ecb`) all run compiled output from `dist/`, so `npm run build:cli` must be run first for any of them to work.
+The legacy CLI pipeline scripts (`check-alignment`, `parse-example`, `ug-to-html`, `tab-to-ecb`) all run compiled output from `dist/`, so `npm run build:cli` must be run first for any of them to work.
 
 ## Architecture Overview
 
@@ -85,8 +85,8 @@ This repo is two things bolted together: a **live web viewer** (current, primary
 - Ships to Vercel as a static build (`vercel.json` → `npm run build:web` → `dist-web/`).
 
 **Legacy CLI pipeline** (`src/*.ts`, non-`web/`, compiled with plain `tsc` per `tsconfig.json`):
-- Original purpose: parse an Ultimate Guitar tab with ChordSheetJS into an intermediate JSON representation (IR, spec in `docs/ir-json-spec.md`), let an LM agent fill in a `pinyin` field per lyric segment, then re-render IR back to a tab (or now, to ECB via `ir-to-ecb.ts`).
-- `ir.ts` defines the IR types/logic; `ir-formatter.ts`, `ir-to-tab.ts`, `ir-to-ecb.ts`, `tab-to-ir.ts`, `tab-to-ecb.ts`, `roundtrip.ts`, `check-alignment.ts`, `ug-to-html.ts`, `parse-example.ts` are the individual conversion/verification steps.
+- Purpose: parse an Ultimate Guitar tab with ChordSheetJS and emit ECB directly, in one pass — `tab-to-ecb.ts` is the CLI entry point, backed by `tab-to-ecb-core.ts`'s `songToEcb()`. No intermediate tree, no JSON representation, no agent-filled-in step, no tab-to-tab roundtripping.
+- `tab-to-ecb.ts` / `tab-to-ecb-core.ts` do the conversion; `check-alignment.ts`, `ug-to-html.ts`, `parse-example.ts` are the other verification/inspection steps.
 - Superseded by the prompt-driven ECB workflow below for new work; only reach for this pipeline when converting an old UG-format tab.
 
 **Song format (ECB):** `.ecb` is this project's own plain-text notation — spec and worked example in `format_spec/format_spec.ecb` and `prompts/general_spec.md`. Key shape: `%%key value` metadata lines, `<Section Title>` headers, and lyric lines made of `[Chord]lang1|lang2|...` segments, where `%%languages` in the header declares how many `|`-separated languages each segment carries and in what order.
@@ -96,9 +96,9 @@ This repo is two things bolted together: a **live web viewer** (current, primary
 - **New songs and translations are produced by prompting an LLM agent, not by writing code.** `prompts/` holds the reusable prompt templates:
   - `general_spec.md` — the ECB format spec + worked example, used as shared context for any ECB-related prompt.
   - `add_pinyin_to_ecb.md` — turns a `chinese`-only ECB file into `chinese, pinyin`.
-  - `translation_spec.md` / `json_to_ecb.md` — guide adding a translated-language track (aiming for singable, roughly syllable-matched lines) and converting IR JSON to ECB.
+  - `translation_spec.md` — guides adding a translated-language track (aiming for singable, roughly syllable-matched lines).
   - When syllable-count-synchronized translation is needed, the agent should use the `count_syllables` MCP tool from the separate `lyric-translator-tools` repo (`~/workdir/lyric-translator-tools`, kept as its own repo — different toolchain (Python/uv) and independently reusable — see its README for MCP config). Don't vendor or copy that tool into this repo.
 - `songs/*.ecb` is the source of truth for what's published on the site — a file only needs to be valid ECB and land in that directory to appear in the catalog. `%%languages` in each file's header must match the number of `|`-separated segments used in its lyric lines.
-- `convert_workdir/` is a gitignored scratch directory for the legacy CLI pipeline's intermediate `.ir.json`/`.txt` files — not for anything that needs to persist; don't treat files there as canonical.
+- `convert_workdir/` is a gitignored scratch directory for ad hoc intermediate files (e.g. `.txt`) when working with the legacy CLI pipeline — not for anything that needs to persist; don't treat files there as canonical.
 - `dist/` (CLI build) and `dist-web/` (web build) are both gitignored build output, not source.
 - Web app styling is Tailwind v4 utility classes inline in JSX (see `CatalogPage.tsx`, `MusicView.tsx`) — no separate stylesheet/CSS module convention beyond `index.css` for globals.

@@ -11,8 +11,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import ChordSheetJS from 'chordsheetjs';
-import { songToIr } from './ir';
-import { irToEcb } from './ir-to-ecb';
+import { songToEcb } from './tab-to-ecb-core';
 
 function main(): void {
   const args = process.argv.slice(2).filter((a) => a !== '');
@@ -33,10 +32,8 @@ function main(): void {
   const parser = new (ChordSheetJS as unknown as {
     UltimateGuitarParser: new () => { parse: (s: string) => unknown };
   }).UltimateGuitarParser();
-  const song = parser.parse(content) as Parameters<typeof songToIr>[0];
-  const ir = songToIr(song, { textAsPinyin, bothPinyinAndLyrics, rawTabContent: content });
-
-  const ecb = irToEcb(ir);
+  const song = parser.parse(content) as Parameters<typeof songToEcb>[0];
+  const ecb = songToEcb(song, { textAsPinyin, bothPinyinAndLyrics, rawTabContent: content });
 
   const outDir = path.dirname(base);
   const inputBase = path.basename(base, path.extname(base));

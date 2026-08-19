@@ -1,11 +1,14 @@
 /**
- * IR conversion: ChordSheetJS Song ↔ our IR (with optional pinyin).
- * Song uses song.lines (flat array); paragraphs are derived via linesToParagraphs.
+ * Convert a ChordSheetJS Song directly to ECB (Extended Chord Bracket) format,
+ * without materializing the IR (Ir/IrParagraph/IrLine/Segment) tree from src/ir.ts.
+ *
+ * This is a single-pass port of songToIr() (src/ir.ts, chord/lyric/pinyin alignment) combined
+ * with irToEcb() (src/ir-to-ecb.ts, ECB line rendering). The intermediate paragraph/line/segment
+ * shapes below are local to this module (EcbSegment/EcbLine/EcbParagraph) — not the Ir-typed tree.
  */
 
 import ChordSheetJS from 'chordsheetjs';
 import wcwidth = require('wcwidth');
-import type { Ir, IrLine, IrParagraph, Segment } from './types/ir';
 
 const CJK_COL_WIDTH = 5 / 3;
 
@@ -58,9 +61,6 @@ function splitByCumulativeWidths(text: string, segWidths: number[]): string[] {
   return result;
 }
 
-/** ChordSheetJS paragraph type for lines we emit (IR has no type, we use a default). */
-const DEFAULT_CHORDSHEET_LINE_TYPE = (ChordSheetJS as unknown as { VERSE: string }).VERSE ?? 'verse';
-
 /** Heuristic: segment chord looks like a chord symbol (e.g. Am, F#m7), not metadata (Capo=4, title text). */
 function looksLikeChordSymbol(s: string): boolean {
   const t = (s ?? '').trim();
@@ -68,12 +68,34 @@ function looksLikeChordSymbol(s: string): boolean {
   return /^[A-Ga-g][#b]?\d*[mM]?(maj|min|sus|dim|aug|maj7|min7|add|omit)*\d*(\/[A-Ga-g][#b]?)?$/i.test(t) || /^[A-G][#b]?(maj|min|m|M|sus|dim|aug)?\d*$/i.test(t);
 }
 
-function toChordSheetType(_label?: string): string {
-  return DEFAULT_CHORDSHEET_LINE_TYPE;
+/** True if the string looks like a chord symbol (e.g. Am, F#m7, Cmaj7). Stricter/uppercase-only variant used at ECB emission time. */
+function looksLikeChord(s: string): boolean {
+  const t = (s ?? '').trim();
+  if (!t) return false;
+  return /^[A-G][#b]?(maj|min|m|M|sus|dim|aug|add|omit)?\d*(\/[A-G][#b]?)?$/.test(t);
 }
 
-export interface SongToIrOptions {
-  /** If true, put parsed line text into pinyin and leave lyrics empty. Default: false (text → lyrics). */
+/** Local (non-IR) segment shape used only within this module. */
+interface EcbSegment {
+  chord: string;
+  lyrics: string;
+  pinyin: string;
+  translation?: string;
+}
+
+/** Local (non-IR) line shape used only within this module. */
+interface EcbLine {
+  segments: EcbSegment[];
+}
+
+/** Local (non-IR) paragraph shape used only within this module. */
+interface EcbParagraph {
+  label?: string;
+  lines: EcbLine[];
+}
+
+export interface SongToEcbOptions {
+  /** If true, put parsed line text into pinyin and leave lyrics empty. Default: false (text -> lyrics). */
   textAsPinyin?: boolean;
   /**
    * If true, parse both pinyin and Chinese lyrics simultaneously.
@@ -86,16 +108,89 @@ export interface SongToIrOptions {
    * and assigned to paragraphs in order (so round-trip preserves [Verse 1] etc.).
    */
   rawTabContent?: string;
+  /**
+   * Language labels in order: [lyrics, pinyin, translation].
+   * Defaults to auto-detection based on which fields are populated.
+   */
+  languages?: string[];
+}
+
+/** Segment is empty if chord, lyrics, pinyin (and translation) are all empty or whitespace. */
+function isSegmentEmpty(s: EcbSegment): boolean {
+  const t = (v: string | undefined) => (v ?? '').trim();
+  return !t(s.chord) && !t(s.lyrics) && !t(s.pinyin) && !t(s.translation);
+}
+
+/** Remove empty segments from each line, then remove lines that have no segments left. Done before merge. */
+function stripEmptySegmentsAndLines(paragraphs: EcbParagraph[]): EcbParagraph[] {
+  return paragraphs.map((para) => {
+    const lines = (para.lines ?? [])
+      .map((line) => ({
+        ...line,
+        segments: (line.segments ?? []).filter((s) => !isSegmentEmpty(s)),
+      }))
+      .filter((line) => line.segments.length > 0);
+    return { ...para, lines };
+  });
+}
+
+/** True if paragraph has no label and no meaningful content (no lines or only empty lines). */
+function isEmptyUnlabeled(para: EcbParagraph): boolean {
+  if (para.label !== undefined && para.label !== '') return false;
+  if (!para.lines?.length) return true;
+  return para.lines.every(
+    (l) => !l.segments?.length || l.segments.every((s) => !s.chord && !s.lyrics && !s.pinyin)
+  );
 }
 
 /**
- * Convert a ChordSheetJS Song to our IR (with empty pinyin slots by default).
- * Use textAsPinyin: true to treat the parsed line text as pinyin instead of lyrics.
+ * Greedily merge neighboring paragraphs that have the same section label
+ * (e.g. multiple "Verse" blocks become one "Verse" with all lines).
+ * First collapses empty unlabeled paragraphs into the previous paragraph so that
+ * same-label sections become adjacent (e.g. Verse, blank, Verse -> one Verse).
  */
-export function songToIr(
-  song: { metadata?: Record<string, unknown>; bodyParagraphs?: Array<{ type?: string; lines?: Array<{ items?: Array<{ chords?: string; lyrics?: string }> }> }> },
-  options?: SongToIrOptions
-): Ir {
+function mergeConsecutiveSectionsWithSameLabel(paragraphs: EcbParagraph[]): EcbParagraph[] {
+  if (paragraphs.length <= 1) return paragraphs;
+  // Collapse empty unlabeled paragraphs into the previous paragraph
+  const collapsed: EcbParagraph[] = [];
+  for (let i = 0; i < paragraphs.length; i++) {
+    const p = paragraphs[i];
+    if (isEmptyUnlabeled(p) && collapsed.length > 0) {
+      collapsed[collapsed.length - 1] = {
+        ...collapsed[collapsed.length - 1],
+        lines: [...collapsed[collapsed.length - 1].lines, ...(p.lines ?? [])],
+      };
+    } else {
+      collapsed.push({ ...p, lines: [...(p.lines ?? [])] });
+    }
+  }
+  // Merge consecutive paragraphs with the same label
+  if (collapsed.length <= 1) return collapsed;
+  const result: EcbParagraph[] = [];
+  let current: EcbParagraph = { ...collapsed[0], lines: [...collapsed[0].lines] };
+  for (let i = 1; i < collapsed.length; i++) {
+    const p = collapsed[i];
+    const sameLabel =
+      current.label !== undefined && p.label !== undefined && current.label === p.label;
+    if (sameLabel) {
+      current = { ...current, lines: [...current.lines, ...p.lines] };
+    } else {
+      result.push(current);
+      current = { ...p, lines: [...p.lines] };
+    }
+  }
+  result.push(current);
+  return result;
+}
+
+/**
+ * Align a ChordSheetJS Song's chords/lyrics/pinyin into local paragraph/line/segment structures.
+ * Direct port of songToIr() (src/ir.ts), minus the unused `meta` field (irToEcb never read IR meta).
+ */
+function buildParagraphs(
+  song: { bodyParagraphs?: Array<{ type?: string; lines?: Array<{ items?: Array<{ chords?: string; lyrics?: string }> }> }> },
+  options?: SongToEcbOptions
+): EcbParagraph[] {
   const bothPinyinAndLyrics = options?.bothPinyinAndLyrics ?? false;
   // In --both mode text from ChordSheetJS items goes to pinyin first; CJK lines are reclassified below.
   const textAsPinyin = (options?.textAsPinyin ?? false) || bothPinyinAndLyrics;
@@ -114,19 +209,12 @@ export function songToIr(
   /** When we see a paragraph that is only a section header line (e.g. [Verse]), assign that label to the next content paragraph. */
   let pendingSectionLabel: string | undefined;
 
-  const meta: Ir['meta'] = {};
-  if (song.metadata && typeof song.metadata === 'object') {
-    const m = song.metadata as Record<string, unknown>;
-    Object.entries(m).forEach(([k, v]) => {
-      if (v != null && typeof v === 'string') meta[k] = v;
-    });
-  }
-  const paragraphs: IrParagraph[] = [];
+  const paragraphs: EcbParagraph[] = [];
 
   for (const para of song.bodyParagraphs ?? []) {
-    const lines: IrLine[] = [];
+    const lines: EcbLine[] = [];
     for (const line of para.lines ?? []) {
-      const segments: Segment[] = [];
+      const segments: EcbSegment[] = [];
       for (const item of line.items ?? []) {
         if ('chords' in item || 'lyrics' in item) {
           const chord = (item.chords != null ? String(item.chords) : '').trim();
@@ -143,12 +231,12 @@ export function songToIr(
     // --both mode: CJK-only lines (no chords, text contains double-width chars) are merged as
     // lyrics into the preceding chord+pinyin line by splitting on column-width boundaries.
     // Standalone CJK lines with no preceding chord line (e.g. Chinese title) are reclassified
-    // from pinyin → lyrics in place.
+    // from pinyin -> lyrics in place.
     if (bothPinyinAndLyrics) {
-      const merged: IrLine[] = [];
-      for (const irLine of lines) {
-        const lineText = irLine.segments.map((s) => s.pinyin ?? '').join('');
-        const allChordsEmpty = irLine.segments.every((s) => !(s.chord ?? ''));
+      const merged: EcbLine[] = [];
+      for (const ecbLine of lines) {
+        const lineText = ecbLine.segments.map((s) => s.pinyin ?? '').join('');
+        const allChordsEmpty = ecbLine.segments.every((s) => !(s.chord ?? ''));
         if (allChordsEmpty && hasCJK(lineText)) {
           const prev = merged.length > 0 ? merged[merged.length - 1] : null;
           const prevHasContent =
@@ -163,15 +251,15 @@ export function songToIr(
             prev.segments.forEach((seg, i) => {
               seg.lyrics = (splits[i] ?? '').trimEnd();
             });
-            continue; // consumed; do not add as its own IrLine
+            continue; // consumed; do not add as its own line
           }
           // No preceding chord+pinyin line — reclassify as lyrics
-          irLine.segments.forEach((seg) => {
+          ecbLine.segments.forEach((seg) => {
             seg.lyrics = seg.pinyin ?? '';
             seg.pinyin = '';
           });
         }
-        merged.push(irLine);
+        merged.push(ecbLine);
       }
       lines.length = 0;
       merged.forEach((l) => lines.push(l));
@@ -274,147 +362,96 @@ export function songToIr(
     });
   }
 
-  return {
-    meta,
-    paragraphs: mergeConsecutiveSectionsWithSameLabel(stripEmptySegmentsAndLines(paragraphs)),
-  };
+  return mergeConsecutiveSectionsWithSameLabel(stripEmptySegmentsAndLines(paragraphs));
 }
 
-/** Segment is empty if chord, lyrics, pinyin (and translation) are all empty or whitespace. */
-function isSegmentEmpty(s: Segment): boolean {
-  const t = (v: string | undefined) => (v ?? '').trim();
-  return !t(s.chord) && !t(s.lyrics) && !t(s.pinyin) && !t(s.translation);
+function segmentHasContent(seg: EcbSegment): boolean {
+  return !!(seg.chord?.trim() || seg.lyrics?.trim() || seg.pinyin?.trim() || seg.translation?.trim());
 }
 
-/** Remove empty segments from each line, then remove lines that have no segments left. Done before merge. */
-function stripEmptySegmentsAndLines(paragraphs: IrParagraph[]): IrParagraph[] {
-  return paragraphs.map((para) => {
-    const lines = (para.lines ?? [])
-      .map((line) => ({
-        ...line,
-        segments: (line.segments ?? []).filter((s) => !isSegmentEmpty(s)),
-      }))
-      .filter((line) => line.segments.length > 0);
-    return { ...para, lines };
-  });
+/** True if the line has at least one segment with a real chord symbol. */
+function lineHasChord(segs: EcbSegment[]): boolean {
+  return segs.some((s) => looksLikeChord(s.chord ?? ''));
 }
 
-/** True if paragraph has no label and no meaningful content (no lines or only empty lines). */
-function isEmptyUnlabeled(para: IrParagraph): boolean {
-  if (para.label !== undefined && para.label !== '') return false;
-  if (!para.lines?.length) return true;
-  return para.lines.every(
-    (l) => !l.segments?.length || l.segments.every((s) => !s.chord && !s.lyrics && !s.pinyin)
-  );
+function buildSegmentStr(
+  seg: EcbSegment,
+  fields: Array<'lyrics' | 'pinyin' | 'translation'>
+): string {
+  const chord = seg.chord?.trim() ?? '';
+  if (fields.length === 0) return `[${chord}]`;
+
+  const values = fields.map((f) => (seg[f] ?? '').trimEnd());
+  const hasAny = values.some((v) => v.trim() !== '');
+
+  // Chord-only segment: no lyrics in any language slot
+  if (!hasAny) return `[${chord}]`;
+
+  return `[${chord}]${values.join('|')}`;
 }
 
 /**
- * Greedily merge neighboring paragraphs that have the same section label
- * (e.g. multiple "Verse" blocks become one "Verse" with all lines).
- * First collapses empty unlabeled paragraphs into the previous paragraph so that
- * same-label sections become adjacent (e.g. Verse, blank, Verse -> one Verse).
+ * Convert a ChordSheetJS Song directly to an ECB string, aligning chords/lyrics/pinyin
+ * and rendering ECB output in one pass (no Ir/IrParagraph/IrLine/Segment tree involved).
  */
-function mergeConsecutiveSectionsWithSameLabel(paragraphs: IrParagraph[]): IrParagraph[] {
-  if (paragraphs.length <= 1) return paragraphs;
-  // Collapse empty unlabeled paragraphs into the previous paragraph
-  const collapsed: IrParagraph[] = [];
-  for (let i = 0; i < paragraphs.length; i++) {
-    const p = paragraphs[i];
-    if (isEmptyUnlabeled(p) && collapsed.length > 0) {
-      collapsed[collapsed.length - 1] = {
-        ...collapsed[collapsed.length - 1],
-        lines: [...collapsed[collapsed.length - 1].lines, ...(p.lines ?? [])],
-      };
-    } else {
-      collapsed.push({ ...p, lines: [...(p.lines ?? [])] });
-    }
-  }
-  // Merge consecutive paragraphs with the same label
-  if (collapsed.length <= 1) return collapsed;
-  const result: IrParagraph[] = [];
-  let current: IrParagraph = { ...collapsed[0], lines: [...collapsed[0].lines] };
-  for (let i = 1; i < collapsed.length; i++) {
-    const p = collapsed[i];
-    const sameLabel =
-      current.label !== undefined && p.label !== undefined && current.label === p.label;
-    if (sameLabel) {
-      current = { ...current, lines: [...current.lines, ...p.lines] };
-    } else {
-      result.push(current);
-      current = { ...p, lines: [...p.lines] };
-    }
-  }
-  result.push(current);
-  return result;
-}
+export function songToEcb(
+  song: { metadata?: Record<string, unknown>; bodyParagraphs?: Array<{ type?: string; lines?: Array<{ items?: Array<{ chords?: string; lyrics?: string }> }> }> },
+  options?: SongToEcbOptions
+): string {
+  const paragraphs = buildParagraphs(song, options);
 
-/** ChordSheetJS Song-like type we build and pass to formatter */
-interface BuiltSong {
-  lines: unknown[];
-  metadata?: Record<string, string>;
-}
-
-/**
- * Convert IR back to a ChordSheetJS Song. Uses song.lines (flat array); empty lines between paragraphs.
- */
-export function irToSong(ir: Ir): BuiltSong {
-  const Song = (ChordSheetJS as unknown as { Song: new () => BuiltSong & { metadata?: Record<string, string> } }).Song;
-  const Line = (ChordSheetJS as unknown as { Line: new (opts?: { type?: string; items?: unknown[] }) => unknown }).Line;
-  const ChordLyricsPair = (ChordSheetJS as unknown as { ChordLyricsPair: new (chords?: string, lyrics?: string | null) => unknown }).ChordLyricsPair;
-
-  if (!Song || !Line || !ChordLyricsPair) {
-    throw new Error('ChordSheetJS did not export Song, Line, or ChordLyricsPair.');
-  }
-
-  const song = new Song() as BuiltSong & { metadata?: Record<string, string> };
-
-  if (ir.meta && Object.keys(ir.meta).length > 0 && song.metadata) {
-    Object.entries(ir.meta).forEach(([key, value]) => {
-      if (value != null && value !== '') song.metadata![key] = value;
-    });
-  }
-
-  const lines: unknown[] = [];
-
-  for (let p = 0; p < ir.paragraphs.length; p++) {
-    const para = ir.paragraphs[p];
-    const lineType = toChordSheetType(para.label);
-    const labelStr = para.label != null ? String(para.label).trim() : '';
-
-    // Emit section header line [label] only when label is non-empty
-    if (labelStr !== '') {
-      const titleLine = new Line({
-        type: lineType,
-        items: [new ChordLyricsPair('', `[${labelStr}]`)],
-      });
-      lines.push(titleLine);
-    }
-
-    for (const irLine of para.lines) {
-      const segments = irLine.segments ?? [];
-      const items = segments.map(
-        (seg) => new ChordLyricsPair(seg.chord ?? '', seg.lyrics ?? '')
-      );
-      if (items.length === 0) {
-        items.push(new ChordLyricsPair('', ''));
-      }
-      const line = new Line({ type: lineType, items });
-      lines.push(line);
-      // If any segment has pinyin, emit a second line (chord-free) with pinyin so output shows both lyrics and pinyin.
-      const hasPinyin = segments.some((seg) => (seg.pinyin ?? '').trim() !== '');
-      if (hasPinyin) {
-        const pinyinItems = segments.map(
-          (seg) => new ChordLyricsPair('', seg.pinyin ?? '')
-        );
-        lines.push(new Line({ type: lineType, items: pinyinItems }));
+  // Auto-detect which fields are populated across all segments
+  let hasLyrics = false;
+  let hasPinyin = false;
+  let hasTranslation = false;
+  for (const para of paragraphs) {
+    for (const line of para.lines) {
+      for (const seg of line.segments) {
+        if (seg.lyrics?.trim()) hasLyrics = true;
+        if (seg.pinyin?.trim()) hasPinyin = true;
+        if (seg.translation?.trim()) hasTranslation = true;
       }
     }
+  }
 
-    if (p < ir.paragraphs.length - 1) {
-      lines.push(new Line({ type: toChordSheetType('none'), items: [] }));
+  // Field order: lyrics (main/Chinese), pinyin, translation
+  const fields: Array<'lyrics' | 'pinyin' | 'translation'> = [];
+  const langNames: string[] = [];
+
+  if (options?.languages) {
+    const langs = options.languages;
+    const mapping: Array<['lyrics' | 'pinyin' | 'translation', string]> = [
+      ['lyrics', langs[0] ?? 'chinese'],
+      ['pinyin', langs[1] ?? 'pinyin'],
+      ['translation', langs[2] ?? 'translation'],
+    ];
+    for (const [field, lang] of mapping.slice(0, langs.length)) {
+      fields.push(field);
+      langNames.push(lang);
+    }
+  } else {
+    if (hasLyrics) { fields.push('lyrics'); langNames.push('chinese'); }
+    if (hasPinyin) { fields.push('pinyin'); langNames.push('pinyin'); }
+    if (hasTranslation) { fields.push('translation'); langNames.push('translation'); }
+  }
+
+  const header: string[] = [];
+  if (langNames.length > 0) {
+    header.push(`%%languages ${langNames.join(', ')}`);
+  }
+
+  const ecbLines: string[] = [];
+  for (const para of paragraphs) {
+    for (const ecbLine of para.lines) {
+      const segs = ecbLine.segments.filter(segmentHasContent);
+      if (segs.length === 0) continue;
+      // Skip lines with no actual chord symbol (metadata, free-text, etc.)
+      if (!lineHasChord(segs)) continue;
+      ecbLines.push(segs.map((seg) => buildSegmentStr(seg, fields)).join(' '));
     }
   }
 
-  song.lines = lines;
-  return song;
+  const headerStr = header.join('\n');
+  const bodyStr = ecbLines.join('\n\n');
+  return headerStr ? headerStr + '\n\n' + bodyStr : bodyStr;
 }
