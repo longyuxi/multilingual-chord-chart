@@ -26,6 +26,7 @@
     "parse-example": "node dist/parse-example.js",
     "ug-to-html": "node dist/ug-to-html.js",
     "tab-to-ecb": "node dist/tab-to-ecb.js",
-    "ecb-syllable-matcher": "node dist/ecb-syllable-matcher.js"
+    "ecb-syllable-matcher": "node dist/ecb-syllable-matcher.js",
+    "export-lyrics": "node dist/export-lyrics.js"
   }
 }
