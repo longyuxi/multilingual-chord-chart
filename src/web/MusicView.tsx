@@ -194,7 +194,6 @@ const WIDTH_OPTIONS: { label: string; className: string }[] = [
   { label: '70% of window', className: 'w-[70%]' },
   { label: '100% of window', className: 'w-full' },
 ];
-const WIDTH_DEFAULT_IDX = 1; // max-w-3xl, matches prior fixed width
 
 function getConfigTranspose(blocks: EcbBlock[]): number | null {
   for (const block of blocks) {
@@ -220,9 +219,9 @@ export default function MusicView({ song, onBack }: Props) {
     () => new Set(languages.map((_, i) => i))
   );
   const [transpose, setTranspose] = useState(0);
-  const [reflow, setReflow] = useState(false);
-  const [fontScale, setFontScale] = useState(0);
-  const [widthIdx, setWidthIdx] = useState(WIDTH_DEFAULT_IDX);
+  const [reflow, setReflow] = useState(true);
+  const [fontScale, setFontScale] = useState(1);
+  const [widthIdx, setWidthIdx] = useState(WIDTH_OPTIONS.length - 1);
 
   function toggleLang(i: number) {
     setEnabledLangs(prev => {
