@@ -113,7 +113,7 @@ function renderBlock(block: RenderBlock, idx: number, enabledLangs: Set<number>,
                 return (
                   <td key={i} className="pr-3 whitespace-nowrap">
                     <div className={`font-sans ${scaledText('text-sm', scale)} font-semibold min-h-[1.1em] ${valid ? 'text-sky-600' : 'text-red-500'}`}>
-                      {chordText}
+                      {chordText || ' '}
                     </div>
                   </td>
                 );
@@ -148,7 +148,7 @@ function renderBlock(block: RenderBlock, idx: number, enabledLangs: Set<number>,
             return (
               <div key={i} className="whitespace-nowrap">
                 <div className={`font-sans ${scaledText('text-sm', scale)} font-semibold min-h-[1.1em] ${valid ? 'text-sky-600' : 'text-red-500'}`}>
-                  {chordText}
+                  {chordText || ' '}
                 </div>
                 {showLang.map((show, j) => show ? (
                   <div key={j} className={`font-sans ${scaledText('text-sm', scale)} min-h-[1.3em] text-gray-700 border-b border-gray-200`}>
