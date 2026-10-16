@@ -56,6 +56,16 @@ Timestamps are opt-in per lyric segment and as sparse as you like — annotate e
 
 Here `Am` starts at 0:45, `Dm7` carries no timestamp, and `G` starts at 1:20. Accepted forms are `@45` (seconds), `@1:30` (M:SS), and `@1:02:03` (H:MM:SS). The marker is stripped from the displayed lyrics; if the song has no `%%youtube`, markers are simply ignored.
 
+A timestamp can also sit on a line of its own, directly above the lyric line it annotates — it then applies to that line's first segment:
+
+```
+<Verse 1>
+@0:40
+[C]只要|zhi yao[Em7/B]你说|ni shuo
+```
+
+The marker line must be immediately above its lyric line (a blank line or section title in between abandons it), and an inline marker on the target segment wins over the carried-down one.
+
 ---
 
 <details>

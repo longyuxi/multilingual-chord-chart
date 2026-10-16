@@ -12,6 +12,10 @@ export type EcbSegment = {
 // `@45`, `@1:30`, `@1:02:03` — bare seconds, M:SS, or H:MM:SS.
 const TIMESTAMP_RE = /@(\d+(?::\d+){0,2})/g;
 
+// A line consisting of nothing but a single timestamp marker, e.g. `@0:40` on
+// its own line, annotates the first segment of the lyric line that follows it.
+const STANDALONE_TIMESTAMP_RE = /^@\d+(?::\d+){0,2}$/;
+
 /** Parses `45` / `1:30` / `1:02:03` into seconds. */
 export function parseTimestamp(raw: string): number {
   return raw.split(':').reduce((acc, part) => acc * 60 + parseInt(part, 10), 0);
@@ -62,6 +66,10 @@ export function parseEcbBlocks(raw: string): EcbBlock[] {
   const blocks: EcbBlock[] = [];
   let configBuffer: { key: string; value: string }[] = [];
 
+  // Set by a standalone `@M:SS` line; consumed by the next lyric line's first
+  // segment and abandoned by any other kind of line.
+  let standaloneTime: number | undefined;
+
   function flushConfig() {
     if (configBuffer.length > 0) {
       blocks.push({ kind: 'config_table', entries: configBuffer });
@@ -83,8 +91,18 @@ export function parseEcbBlocks(raw: string): EcbBlock[] {
     // Non-config line: flush config first
     flushConfig();
 
+    // A line that is nothing but a timestamp marker annotates the first
+    // segment of the lyric line that directly follows it.
+    const trimmed = line.trim();
+    if (STANDALONE_TIMESTAMP_RE.test(trimmed)) {
+      standaloneTime = parseTimestamp(trimmed.slice(1));
+      continue;
+    }
+    const carried = standaloneTime;
+    standaloneTime = undefined;
+
     // Blank line
-    if (line.trim() === '') {
+    if (trimmed === '') {
       blocks.push({ kind: 'empty' });
       continue;
     }
@@ -110,7 +128,11 @@ export function parseEcbBlocks(raw: string): EcbBlock[] {
       // that follows it, so it has to be carried across runs: `@0:45 [Am]...`
       // (marker in the leading text) and `[Am]... @1:20 [Dm]...` (marker at the
       // tail of a previous segment's text) both attach to the next segment.
+      // A marker carried over from a standalone `@M:SS` line applies to the
+      // first segment of this line, unless that segment has its own inline
+      // marker, which wins.
       let pending: number | undefined;
+      let first = true;
 
       // Capture leading text before the first bracket
       const firstBracket = line.indexOf('[');
@@ -118,7 +140,9 @@ export function parseEcbBlocks(raw: string): EcbBlock[] {
       pending = leading.times[leading.times.length - 1];
       if (leading.text.trim() !== '') {
         const lyrics = leading.text.trim().split('|').map(s => s.trim());
-        segments.push(pending === undefined ? { chord: '', lyrics } : { chord: '', lyrics, time: pending });
+        const time = pending !== undefined ? pending : (first ? carried : undefined);
+        segments.push(time === undefined ? { chord: '', lyrics } : { chord: '', lyrics, time });
+        first = false;
         pending = undefined;
       }
 
@@ -130,7 +154,9 @@ export function parseEcbBlocks(raw: string): EcbBlock[] {
         const lyrics = text.trim() === ''
           ? Array(numLanguages).fill('')
           : text.trim().split('|').map(s => s.trim());
-        segments.push(pending === undefined ? { chord, lyrics } : { chord, lyrics, time: pending });
+        const time = pending !== undefined ? pending : (first ? carried : undefined);
+        segments.push(time === undefined ? { chord, lyrics } : { chord, lyrics, time });
+        first = false;
         pending = times[times.length - 1];
       }
       if (segments.length > 0) {

@@ -23,6 +23,13 @@
 %   @0:45 [Am]是 遥遥的路|shi yao yao de lu [Dm7]⼭野|shan ye @1:20 [G]⼤雾⾥的|da wu li de
 %   @0:45 []你|ni|You
 % Above, the Am segment starts at 0:45, Dm7 carries no timestamp, and G starts at 1:20.
+% A timestamp may also be written alone on a line of its own, in which case it
+% annotates the first segment of the lyric line that directly follows it:
+%   @0:40
+%   [C]只要|zhi yao[Em7/B]你说|ni shuo
+% The marker line must sit directly above its lyric line — a blank line, section
+% title, or free text in between abandons the timestamp. An inline marker on the
+% target segment takes precedence over one carried down from a marker line.
 % A timestamp is stripped from the lyric text and is only meaningful to a viewer that
 % can play the song's audio; the web viewer renders it as a link that seeks playback.
 
