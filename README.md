@@ -40,9 +40,21 @@ Languages for the lyrics are specified by a parameter in the header of the ECB f
 - **Language toggles** — show/hide individual language rows per song
 - **Transposition** — semitone `−`/`+` control; *Transcribed* and *Actual* preset buttons (when `%%transpose` is set)
 - **YouTube embed** — appears below metadata when `%%youtube` is set
+- **Timestamp links** — an optional `@M:SS` marker before any lyric segment renders as a clickable `▶ M:SS` link that seeks the embedded video to that point without reloading it
 - **Show Source** — expandable raw ECB view with a copy button
 
 (Metadata configuration keys recognized by the web viewer: `title`, `artist`, `languages`, `transpose`, `youtube`)
+
+#### Timestamp markers
+
+Timestamps are opt-in per lyric segment and as sparse as you like — annotate every segment, one per section, or none at all. A marker is written immediately before the segment it applies to, so it goes just before that segment's `[Chord]`:
+
+```
+<verse 1>
+@0:45 [Am]是 遥遥的路|shi yao yao de lu [Dm7]⼭野|shan ye @1:20 [G]⼤雾⾥的|da wu li de
+```
+
+Here `Am` starts at 0:45, `Dm7` carries no timestamp, and `G` starts at 1:20. Accepted forms are `@45` (seconds), `@1:30` (M:SS), and `@1:02:03` (H:MM:SS). The marker is stripped from the displayed lyrics; if the song has no `%%youtube`, markers are simply ignored.
 
 ---
 

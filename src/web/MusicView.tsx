@@ -1,7 +1,8 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useCallback } from 'react';
 import { Song } from './songs';
-import { parseEcbBlocks, EcbBlock, EcbSegment } from './ecb-viewer-parser';
+import { parseEcbBlocks, EcbBlock, EcbSegment, formatTimestamp } from './ecb-viewer-parser';
 import { transposeChord } from './chord-transposer';
+import YoutubePlayer, { SeekRequest } from './YoutubePlayer';
 
 type Props = {
   song: Song;
@@ -37,6 +38,10 @@ function groupForReflow(blocks: EcbBlock[]): RenderBlock[] {
 
 const TEXT_SCALE_CLASSES = ['text-xs', 'text-sm', 'text-base', 'text-lg', 'text-xl', 'text-2xl', 'text-3xl'];
 
+// Reserved height for the timestamp badge row, sized to fit the scaled badge
+// text (which has leading-none, so its height equals the font size).
+const ROW_HEIGHT_CLASSES = ['h-3', 'h-4', 'h-5', 'h-6', 'h-7', 'h-8', 'h-9'];
+
 const FONT_SCALE_OPTIONS: { label: string; value: number }[] = [
   { label: 'Small', value: -1 },
   { label: 'Normal', value: 0 },
@@ -52,7 +57,33 @@ function scaledText(base: string, scale: number): string {
   return TEXT_SCALE_CLASSES[next];
 }
 
-function renderBlock(block: RenderBlock, idx: number, enabledLangs: Set<number>, transpose: number, scale: number): React.ReactNode {
+function scaledRowHeight(scale: number): string {
+  const idx = Math.min(ROW_HEIGHT_CLASSES.length - 1, Math.max(0, ROW_HEIGHT_CLASSES.indexOf('h-4') + scale));
+  return ROW_HEIGHT_CLASSES[idx];
+}
+
+type RenderContext = {
+  enabledLangs: Set<number>;
+  transpose: number;
+  scale: number;
+  onSeek: ((seconds: number) => void) | null;
+};
+
+function TimestampLink({ seconds, onSeek, scale }: { seconds: number; onSeek: (seconds: number) => void; scale: number }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onSeek(seconds)}
+      title="Play the video from here"
+      className={`font-mono ${scaledText('text-sm', scale)} leading-none text-rose-600 hover:text-rose-800 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 rounded`}
+    >
+      ▶ {formatTimestamp(seconds)}
+    </button>
+  );
+}
+
+function renderBlock(block: RenderBlock, idx: number, ctx: RenderContext): React.ReactNode {
+  const { enabledLangs, transpose, scale, onSeek } = ctx;
   switch (block.kind) {
     case 'config_table':
       return (
@@ -103,9 +134,21 @@ function renderBlock(block: RenderBlock, idx: number, enabledLangs: Set<number>,
       const showLang = Array.from({ length: numLangs }, (_, j) =>
         enabledLangs.has(j) && block.segments.some(seg => (seg.lyrics[j] ?? '') !== '')
       );
+      // Reserve the timestamp row for every column in the line, not just the
+      // annotated ones, so chords keep lining up with the lyrics below them.
+      const showTimes = onSeek !== null && block.segments.some(seg => seg.time !== undefined);
       return (
         <table key={idx} className="border-collapse my-2">
           <tbody>
+            {showTimes && (
+              <tr>
+                {block.segments.map((seg, i) => (
+                  <td key={i} className={`pr-3 ${scaledRowHeight(scale)} leading-none align-bottom`}>
+                    {seg.time !== undefined && <TimestampLink seconds={seg.time} onSeek={onSeek!} scale={scale} />}
+                  </td>
+                ))}
+              </tr>
+            )}
             {/* Chord row */}
             <tr>
               {block.segments.map((seg, i) => {
@@ -141,12 +184,20 @@ function renderBlock(block: RenderBlock, idx: number, enabledLangs: Set<number>,
       const showLang = Array.from({ length: numLangs }, (_, j) =>
         enabledLangs.has(j) && block.segments.some(seg => (seg.lyrics[j] ?? '') !== '')
       );
+      // Reserve the timestamp row for every column in the flow, not just the
+      // annotated ones, so chords keep lining up with the lyrics below them.
+      const showTimes = onSeek !== null && block.segments.some(seg => seg.time !== undefined);
       return (
         <div key={idx} className="flex flex-wrap items-start gap-x-3 gap-y-2 my-2">
           {block.segments.map((seg, i) => {
             const { text: chordText, valid } = transposeChord(seg.chord, transpose);
             return (
               <div key={i} className="whitespace-nowrap">
+                {showTimes && (
+                  <div className={`${scaledRowHeight(scale)} leading-none`}>
+                    {seg.time !== undefined && <TimestampLink seconds={seg.time} onSeek={onSeek!} scale={scale} />}
+                  </div>
+                )}
                 <div className={`font-sans ${scaledText('text-sm', scale)} font-semibold min-h-[1.1em] ${valid ? 'text-sky-600' : 'text-red-500'}`}>
                   {chordText || ' '}
                 </div>
@@ -215,6 +266,20 @@ export default function MusicView({ song, onBack }: Props) {
   const youtubeId = useMemo(() => getYoutubeId(blocks), [blocks]);
 
   const [showSource, setShowSource] = useState(false);
+  const [seekRequest, setSeekRequest] = useState<SeekRequest | null>(null);
+  const playerHostRef = useRef<HTMLDivElement | null>(null);
+
+  const seekTo = useCallback((seconds: number) => {
+    setSeekRequest(prev => ({ seconds, nonce: (prev?.nonce ?? 0) + 1 }));
+    // The embed sits above a long chart, so bring it back into view once it has
+    // scrolled off; if it is already on screen, leave the reader where they are.
+    const host = playerHostRef.current;
+    if (!host) return;
+    const rect = host.getBoundingClientRect();
+    if (rect.top < 120 || rect.bottom > window.innerHeight) {
+      host.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, []);
   const [enabledLangs, setEnabledLangs] = useState<Set<number>>(
     () => new Set(languages.map((_, i) => i))
   );
@@ -355,24 +420,21 @@ export default function MusicView({ song, onBack }: Props) {
           const before = splitIdx >= 0 ? blocks.slice(0, splitIdx + 1) : [];
           const afterRaw = splitIdx >= 0 ? blocks.slice(splitIdx + 1) : blocks;
           const after: RenderBlock[] = reflow ? groupForReflow(afterRaw) : afterRaw;
+          const ctx: RenderContext = {
+            enabledLangs,
+            transpose,
+            scale: fontScale,
+            onSeek: youtubeId ? seekTo : null,
+          };
           return (
             <>
-              {before.map((block, idx) => renderBlock(block, idx, enabledLangs, transpose, fontScale))}
+              {before.map((block, idx) => renderBlock(block, idx, ctx))}
               {youtubeId && (
-                <div className="mb-6 w-4/5 mx-auto">
-                  <iframe
-                    className="w-full aspect-video rounded"
-                    src={`https://www.youtube.com/embed/${youtubeId}`}
-                    title="YouTube video player"
-                    frameBorder="0"
-                    allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                    referrerPolicy="strict-origin-when-cross-origin"
-                    allowFullScreen
-                    loading="lazy"
-                  />
+                <div ref={playerHostRef} className="mb-6 w-4/5 mx-auto scroll-mt-36">
+                  <YoutubePlayer videoId={youtubeId} seekRequest={seekRequest} />
                 </div>
               )}
-              {after.map((block, idx) => renderBlock(block, splitIdx + 1 + idx, enabledLangs, transpose, fontScale))}
+              {after.map((block, idx) => renderBlock(block, splitIdx + 1 + idx, ctx))}
             </>
           );
         })()}

@@ -12,6 +12,20 @@
 % A lyric segment is also allowed to have no lyric but only a chord. This is called an empty lyric segment and could be useful for instrumental sections. e.g. [Am][Dm][G][Cmaj7]. In this case, the only thing that is allowed to follow a chord symbol is either another chord symbol or a new line character (after stripping whitespace).
 % A line is allowed to have multiple lyric segments.
 
+% A lyric segment may carry an optional playback timestamp, written as an @-prefixed
+% time — @45 (seconds), @1:30 (M:SS), or @1:02:03 (H:MM:SS) — placed immediately
+% before the segment it annotates. Timestamps are always optional and deliberately
+% sparse: a file may annotate as many or as few segments as it likes, and a file
+% with none at all behaves exactly as before.
+% A timestamp is written in the text that precedes its segment, so a marker for a
+% chord-bearing segment goes just before its opening bracket, and a marker for a
+% segment with no chord symbol goes at the start of that segment:
+%   @0:45 [Am]是 遥遥的路|shi yao yao de lu [Dm7]⼭野|shan ye @1:20 [G]⼤雾⾥的|da wu li de
+%   @0:45 []你|ni|You
+% Above, the Am segment starts at 0:45, Dm7 carries no timestamp, and G starts at 1:20.
+% A timestamp is stripped from the lyric text and is only meaningful to a viewer that
+% can play the song's audio; the web viewer renders it as a link that seeks playback.
+
 % The language for each lyric is specified using the languages configuration parameter (comma separated, leading and trailing whitespaces stripped). For example, the languages configuration parameters for the above should be
 % %%languages chinese, pinyin
 % A non-empty lyric segment should have as many languages as this parameter specifies.
