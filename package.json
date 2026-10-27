@@ -30,6 +30,7 @@
     "ecb-syllable-matcher": "node dist/ecb-syllable-matcher.js",
     "export-lyrics": "node dist/export-lyrics.js",
     "timestamps": "node dist/timestamps/cli.js",
-    "check-timestamps": "node dist/timestamps/check.js"
+    "check-timestamps": "node dist/timestamps/check.js",
+    "golden-timestamps": "node dist/timestamps/golden.js"
   }
 }

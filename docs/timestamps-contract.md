@@ -54,9 +54,17 @@ are already wired; `src/**/*` is included and `src/web` stays excluded
 - **Monotonic for v1.** Each lyric line is matched at most once. Arrangements
   that repeat a section more times than the file lists are *flagged*
   (`repeat-suspected`), not solved.
-- **Emission is idempotent.** Markers are whole-second floored (`formatMarker`),
-  previously generated standalone markers are stripped before insertion, so a
-  second run on an already-timestamped file is byte-identical.
+- **Emission is idempotent and single-owner.** Markers are whole-second
+  floored (`formatMarker`); every marker already in the file -- standalone *and*
+  inline -- is stripped before insertion, so a second run on an
+  already-timestamped file is byte-identical. Inline markers go too because a
+  hand-made inline marker is a fixed point a regenerated standalone set cannot
+  respect: the file would carry two marker sources that disagree, and
+  `check-timestamps` rejects the result as non-monotonic. Running the pipeline
+  on a file therefore rewrites its markers; recover a hand-authored inline
+  marker from git history if a run destroys one.
+- **The LLM never edits the .ecb.** It may only propose a bounded patch
+  (`TimestampPatch`) over flagged lines, applied in code.
 - **No stage may import from `src/web/`**; that tree is excluded from the CLI
   tsconfig. `ecb-markers.ts` is the CLI-side twin of the viewer's marker parser
   and must keep the same grammar.
