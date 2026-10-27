@@ -19,7 +19,10 @@
 //
 // `src/web/` is excluded from the CLI build (tab-pinyinizer-xql), so the ECB grammar is
 // re-implemented here the same way `src/timestamps/check.ts` does it; marker pairing is
-// imported from `ecb-markers.ts` so the auditor and the pipeline share one grammar.
+// imported from `ecb-markers.ts` so the auditor and the pipeline share one grammar. That
+// re-implementation includes the chordless segment a line may open with (`请|qing|please[C]
+// 用...`): text before the first bracket is part of the sung line, so dropping it would
+// make the auditor disagree with the placer (tab-pinyinizer-i8v.7).
 //
 // Usage:
 //   npm run build:cli
@@ -84,8 +87,17 @@ const COMPATIBILITY_IDEOGRAPH_RE = /[\u2e80-\u2fdf\uf900-\ufaff]/;
 /** Full-width punctuation (U+3000-U+303F, U+FF00-U+FF65): cosmetic, not a defect. */
 const FULLWIDTH_PUNCTUATION_RE = /[\u3000-\u303f\uff01-\uff65]/;
 
-/** Han after NFKC, so a Kangxi radical counts as the character it stands in for. */
-const HAN_RE = /[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\u20000-\u2a6df]/u;
+/**
+ * Han after NFKC, so a Kangxi radical (U+2F00-U+2FDF) counts as the character it stands in
+ * for. The radicals supplement (U+2E80-U+2EFF) is mostly fold-free, so it is listed
+ * explicitly: `unnormalized-chars` still reports those codepoints as errors, but the
+ * Han-count fallback must not silently undercount them in the meantime.
+ *
+ * The Ext B range has to be braced: `\u20000-\u2a6df` is read as `\u2000` plus the range
+ * `0-\u2a6d`, which claims ASCII letters and digits as Han and misses U+20000-U+2A6DF
+ * entirely (tab-pinyinizer-i8v.7). `assertHanRanges` pins both halves of that.
+ */
+const HAN_RE = /[\u2e80-\u2fdf\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\u{20000}-\u{2a6df}]/u;
 
 export type FindingCode =
   | 'missing-metadata'
@@ -241,6 +253,18 @@ function parseSong(raw: string): ParsedSong {
     const inlineMarkers = (line.match(MARKER_RE) ?? []).length;
     const withoutMarkers = line.replace(MARKER_RE, '');
     const segments: ParsedSegment[] = [];
+    // Text before the first bracket is a chordless segment at segmentIndex 0 -- the
+    // numbering `ecb-syllable-matcher` emits -- so per-line counts cover the whole line.
+    // Markers in the leading run were already counted above and are stripped here, and a
+    // run of nothing but markers leaves no segment.
+    const leadingText = withoutMarkers.slice(0, withoutMarkers.indexOf('[')).trim();
+    if (leadingText !== '') {
+      segments.push({
+        segmentIndex: 0,
+        chord: '',
+        tracks: leadingText.split('|').map((track) => track.trim()),
+      });
+    }
     for (const match of withoutMarkers.matchAll(SEGMENT_RE)) {
       const chord = match[1].trim();
       const text = match[2].trim();
@@ -287,6 +311,34 @@ function hanCount(text: string): number {
     if (HAN_RE.test(char)) count += 1;
   }
   return count;
+}
+
+/**
+ * `HAN_RE` fails silently when it is wrong: the misparse that motivated this guard claimed
+ * every ASCII letter as Han, so instead of a number being off the audit "measured" English
+ * lines as Han syllables and had nothing to compare. There is no test runner in this repo,
+ * so the range behaviour that matters is pinned at the entry point: Ext B is Han, ASCII
+ * letters and digits are not, and the radicals supplement is.
+ */
+function assertHanRanges(): void {
+  const cases: [string, boolean][] = [
+    ['\u{20000}', true],
+    ['\u{2a6df}', true],
+    ['\u2e80', true],
+    ['\u2f2d', true],
+    ['A', false],
+    ['z', false],
+    ['0', false],
+    ['9', false],
+  ];
+  for (const [text, expected] of cases) {
+    const actual = hanCount(text) === 1;
+    if (actual !== expected) {
+      throw new Error(
+        `HAN_RE counts ${JSON.stringify(text)} as Han: ${actual}, expected ${expected}`,
+      );
+    }
+  }
 }
 
 function tokens(text: string): number {
@@ -824,6 +876,7 @@ function parseArgs(argv: string[]): CliOptions {
 }
 
 function main(): void {
+  assertHanRanges();
   let options: CliOptions;
   try {
     options = parseArgs(process.argv.slice(2));
