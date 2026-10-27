@@ -1,15 +1,23 @@
 // Marker emission (tab-pinyinizer-ilg.5): turn an AlignReport into standalone
 // `@M:SS` lines in the .ecb, and nothing else. A marker on its own line leaves
-// every lyric line -- chords, language columns, inline markers -- byte-identical
-// to what normalize.ts (ilg.2) read, so the pinyin and syllable-matched
-// translation tooling downstream is unaffected.
+// every lyric line's chords and language columns byte-identical to what
+// normalize.ts (ilg.2) read, so the pinyin and syllable-matched translation
+// tooling downstream is unaffected.
 //
-// Re-running is idempotent: standalone markers are all treated as this module's
-// own previous output, stripped, and rebuilt from the report, so emitting twice
-// over the same file and report yields a byte-identical file
+// Re-running is idempotent: every marker in the file is treated as this
+// module's own previous output, stripped, and rebuilt from the report, so
+// emitting twice over the same file and report yields a byte-identical file
 // (docs/timestamps-contract.md, "Emission is idempotent").
+//
+// That includes *inline* markers, not just standalone ones. A hand-made inline
+// marker (condensed_blue_whale.ecb's `@1:52`) is a fixed point in the timeline
+// that a regenerated set of standalone markers cannot respect: the file ends up
+// with two marker sources that disagree about the same song, and check.ts
+// rejects the result as non-monotonic. One owner per file is the only
+// consistent rule, so a file the pipeline writes keeps standalone markers only.
+// Recover a hand-authored inline marker from git history if a run destroys one.
 
-import { findStandaloneMarkers, formatMarker } from './ecb-markers';
+import { findStandaloneMarkers, formatMarker, stripInlineMarkers } from './ecb-markers';
 import type { AlignReport } from './types';
 
 export interface EmitOptions {
@@ -39,6 +47,8 @@ export interface EmitResult {
   inserted: number;
   /** Report lines that did not get a marker (see the reasons in emitMarkers). */
   skipped: number;
+  /** Hand-authored inline markers removed so the emitted set stays single-owner. */
+  staleInlineMarkers: number;
 }
 
 /** Gap used by `density: 'sparse'`, matching condensed_blue_whale.ecb. */
@@ -49,8 +59,9 @@ const DIFF_CONTEXT = 3;
 
 /**
  * Inserts one standalone `@M:SS` marker line directly above every anchored
- * lyric line in `report`, after removing the standalone markers a previous run
- * wrote.
+ * lyric line in `report`, after removing every marker already in the file --
+ * standalone markers from a previous run and inline markers alike (see the
+ * single-owner note at the top of this file).
  *
  * A report line is skipped when its `start` is null (unsung), when its
  * `lineIndex` does not point at a lyric line of `rawEcb`, when `minGap` thins
@@ -63,16 +74,22 @@ export function emitMarkers(rawEcb: string, report: AlignReport, opts: EmitOptio
   const minGap = opts.minGap ?? (opts.density === 'sparse' ? SPARSE_MIN_GAP_SEC : 0);
   const padStart = opts.padStart ?? 0;
 
-  // Every standalone marker is treated as a previous run's output, so it is
-  // removed before rebuilding. Inline markers sit inside lyric lines and are
-  // never touched.
+  // Every marker is treated as a previous run's output, so it is removed
+  // before rebuilding: standalone marker lines disappear entirely, inline ones
+  // are cut out of their lyric line (which keeps its line number, so the
+  // report's lineIndex mapping below still holds).
   const markerLineIndexes = new Set(findStandaloneMarkers(rawEcb).map((marker) => marker.lineIndex));
   const lines: string[] = [];
   const strippedIndexBySourceIndex = new Map<number, number>();
+  let staleInlineMarkers = 0;
   rawEcb.split('\n').forEach((line, sourceIndex) => {
     if (markerLineIndexes.has(sourceIndex)) return;
     strippedIndexBySourceIndex.set(sourceIndex, lines.length);
-    lines.push(line);
+    const withoutInline = stripInlineMarkers(line);
+    // `@1:52` -> `` leaves the segment's language column untouched; collapse
+    // only the doubled space that removal can create in the chord/lyric text.
+    lines.push(withoutInline === line ? line : withoutInline.replace(/(\S) {2,}(?=\S)/g, '$1 '));
+    if (withoutInline !== line) staleInlineMarkers += 1;
   });
 
   const markerByStrippedIndex = new Map<number, string>();
@@ -104,7 +121,9 @@ export function emitMarkers(rawEcb: string, report: AlignReport, opts: EmitOptio
 
   // Nothing anchored: leave the file exactly as it is rather than dropping the
   // markers it already has.
-  if (markerByStrippedIndex.size === 0) return { text: rawEcb, inserted: 0, skipped };
+  if (markerByStrippedIndex.size === 0) {
+    return { text: rawEcb, inserted: 0, skipped, staleInlineMarkers };
+  }
 
   const out: string[] = [];
   lines.forEach((line, index) => {
@@ -117,7 +136,7 @@ export function emitMarkers(rawEcb: string, report: AlignReport, opts: EmitOptio
     out.push(line);
   });
 
-  return { text: out.join('\n'), inserted: markerByStrippedIndex.size, skipped };
+  return { text: out.join('\n'), inserted: markerByStrippedIndex.size, skipped, staleInlineMarkers };
 }
 
 /**

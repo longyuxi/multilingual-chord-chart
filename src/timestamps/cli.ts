@@ -89,6 +89,8 @@ export interface SongResult {
   durationSec?: number;
   /** Lyric lines that received a marker. */
   inserted?: number;
+  /** Hand-authored inline markers removed so the emitted set stays single-owner. */
+  staleInlineMarkers?: number;
   /** Anchored lines thinned out by --min-gap/--density or a duplicate second. */
   markersSkipped?: number;
   /** Lines the aligner flagged (drives ilg.10's repair pass). */
@@ -485,6 +487,7 @@ async function processSong(
         durationSec: round6(audio.durationSec),
         inserted: emitted.inserted,
         markersSkipped: emitted.skipped,
+        staleInlineMarkers: emitted.staleInlineMarkers,
         flagged,
         unanchored: report.unanchored.length,
         report,
@@ -496,6 +499,12 @@ async function processSong(
       `${display}: wrote ${emitted.inserted} markers ` +
         `(${report.unanchored.length} unanchored lines, ${flagged} flagged)`,
     );
+    if (emitted.staleInlineMarkers > 0) {
+      log(
+        `${display}: removed ${emitted.staleInlineMarkers} hand-made inline marker(s); ` +
+          `generated markers replace them (see docs/timestamp-pipeline.md)`,
+      );
+    }
     return {
       ...base,
       status: 'written',
@@ -503,6 +512,7 @@ async function processSong(
       durationSec: round6(audio.durationSec),
       inserted: emitted.inserted,
       markersSkipped: emitted.skipped,
+      staleInlineMarkers: emitted.staleInlineMarkers,
       flagged,
       unanchored: report.unanchored.length,
       report,
