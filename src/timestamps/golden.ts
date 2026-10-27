@@ -105,6 +105,15 @@ interface HandMarker {
   lineIndex: number;
   /** Marker-free primary-language text of that line; '' when it is not a lyric line. */
   lyric: string;
+  /**
+   * What the marker annotates. `line` markers lead their lyric line, which is
+   * exactly what emitMarkers produces, so they are compared line to line.
+   * `segment` markers sit mid-line (the hand `@1:52` annotates the `何` segment
+   * of `[C]卷起 ... [C]何`); a one-marker-per-line emitter has no counterpart to
+   * pair them with, so they are compared against the nearest emitted marker and
+   * the row says so rather than silently reading as a 2s misalignment.
+   */
+  scope: 'line' | 'segment';
 }
 
 interface HandMarkerSet {
@@ -130,6 +139,8 @@ interface MarkerComparison {
   nearestDeltaSec: number | null;
   /** Why this row could not be paired; absent when it was. */
   problem?: string;
+  /** `segment` rows are matched by nearest time, not by line. */
+  pairing: 'line' | 'segment';
 }
 
 export interface GoldenResult {
@@ -285,7 +296,12 @@ function readHandMarkers(ref: string): HandMarkerSet {
     const trimmed = line.trim();
     if (isStandaloneMarkerLine(trimmed)) {
       const target = index + 1;
-      markers.push({ seconds: parseMarkerSeconds(trimmed), lineIndex: target, lyric: lyricAt(target) });
+      markers.push({
+        seconds: parseMarkerSeconds(trimmed),
+        lineIndex: target,
+        lyric: lyricAt(target),
+        scope: 'line',
+      });
       return;
     }
     const times = inlineMarkerTimes(line);
@@ -293,7 +309,22 @@ function readHandMarkers(ref: string): HandMarkerSet {
     // Only the last inline marker on a segment is the one the grammar binds to the
     // text that follows; the others would need segment-level pairing to mean
     // anything, and the golden song has exactly one.
-    markers.push({ seconds: times[times.length - 1], lineIndex: index, lyric: lyricAt(index) });
+    //
+    // A marker with no chord/lyric text before it on its line leads the line
+    // (`@2:06 请|qing...`), so it annotates the line; anything stricter than the
+    // first segment of a line is segment-scoped.
+    const markerAt = (() => {
+      let at = -1;
+      for (const match of line.matchAll(/@\d+(?::\d+){0,2}/g)) at = match.index ?? at;
+      return at;
+    })();
+    const beforeMarker = markerAt > 0 ? line.slice(0, markerAt) : '';
+    markers.push({
+      seconds: times[times.length - 1],
+      lineIndex: index,
+      lyric: lyricAt(index),
+      scope: beforeMarker.trim() === '' ? 'line' : 'segment',
+    });
   });
 
   if (markers.length === 0) {
@@ -392,26 +423,29 @@ export function runGolden(options: CliOptions): GoldenResult {
 
   const rows: MarkerComparison[] = handMarkers.map((marker) => {
     const key = hand.keys.get(marker.lineIndex);
-    const generated = key === undefined ? undefined : generatedByKey.get(key);
     const nearest = nearestMarker(generatedMarkers, marker.seconds);
+    const nearestDeltaSec = nearest === null ? null : round3(nearest.seconds - marker.seconds);
     if (marker.lyric === '') {
       return {
         hand: marker,
         generated: null,
         deltaSec: null,
         withinTolerance: false,
-        nearestDeltaSec: nearest === null ? null : round3(nearest - marker.seconds),
+        nearestDeltaSec,
         problem: 'the marker does not annotate a lyric line',
+        pairing: marker.scope,
       };
     }
+    const generated = marker.scope === 'segment' ? nearest ?? undefined : key === undefined ? undefined : generatedByKey.get(key);
     if (generated === undefined) {
       return {
         hand: marker,
         generated: null,
         deltaSec: null,
         withinTolerance: false,
-        nearestDeltaSec: nearest === null ? null : round3(nearest - marker.seconds),
+        nearestDeltaSec,
         problem: 'no generated marker on this lyric line',
+        pairing: marker.scope,
       };
     }
     const deltaSec = round3(generated.seconds - marker.seconds);
@@ -420,7 +454,8 @@ export function runGolden(options: CliOptions): GoldenResult {
       generated,
       deltaSec,
       withinTolerance: Math.abs(deltaSec) <= options.toleranceSec,
-      nearestDeltaSec: nearest === null ? null : round3(nearest - marker.seconds),
+      nearestDeltaSec,
+      pairing: marker.scope,
     };
   });
 
@@ -458,11 +493,11 @@ export function runGolden(options: CliOptions): GoldenResult {
 }
 
 /** Generated marker closest in time to `seconds`; ties keep the earlier one. */
-function nearestMarker(markers: GeneratedMarker[], seconds: number): number | null {
-  let best: number | null = null;
+function nearestMarker(markers: GeneratedMarker[], seconds: number): GeneratedMarker | null {
+  let best: GeneratedMarker | null = null;
   for (const marker of markers) {
-    if (best === null || Math.abs(marker.seconds - seconds) < Math.abs(best - seconds)) {
-      best = marker.seconds;
+    if (best === null || Math.abs(marker.seconds - seconds) < Math.abs(best.seconds - seconds)) {
+      best = marker;
     }
   }
   return best;
@@ -513,7 +548,12 @@ function renderText(result: GoldenResult): string {
     const delta = row.deltaSec === null ? '--' : formatDelta(row.deltaSec);
     const verdict = row.withinTolerance ? 'ok' : row.problem === undefined ? 'MISS' : 'UNPAIRED';
     const nearest = row.nearestDeltaSec === null ? '--' : formatDelta(row.nearestDeltaSec);
-    const lyric = row.problem === undefined ? row.hand.lyric : `${row.hand.lyric}  (${row.problem})`;
+    const lyric =
+      row.problem !== undefined
+        ? `${row.hand.lyric}  (${row.problem})`
+        : row.pairing === 'segment'
+          ? `${row.hand.lyric}  (segment-anchored: nearest emitted marker)`
+          : row.hand.lyric;
     lines.push(
       `  ${pad(handLabel, 8)}${pad(generatedLabel, 11)}${pad(delta, 8)}${pad(verdict, 9)}` +
         `${pad(nearest, 9)}${lyric}`,
