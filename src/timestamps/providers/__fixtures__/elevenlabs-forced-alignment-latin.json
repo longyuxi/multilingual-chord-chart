@@ -1,0 +1,29 @@
+{
+  "characters": [
+    { "text": "S", "start": 0.12, "end": 0.2, "loss": 0.0312 },
+    { "text": "t", "start": 0.2, "end": 0.24, "loss": 0.0288 },
+    { "text": "a", "start": 0.24, "end": 0.3, "loss": 0.0355 },
+    { "text": "r", "start": 0.3, "end": 0.34, "loss": 0.0401 },
+    { "text": "r", "start": 0.34, "end": 0.38, "loss": 0.0372 },
+    { "text": "y", "start": 0.38, "end": 0.46, "loss": 0.0331 },
+    { "text": ",", "start": 0.46, "end": 0.5, "loss": 0.5114 },
+    { "text": " ", "start": 0.5, "end": 0.62, "loss": 0.4802 },
+    { "text": "s", "start": 0.62, "end": 0.7, "loss": 0.0299 },
+    { "text": "t", "start": 0.7, "end": 0.74, "loss": 0.0271 },
+    { "text": "a", "start": 0.74, "end": 0.8, "loss": 0.0364 },
+    { "text": "r", "start": 0.8, "end": 0.84, "loss": 0.0412 },
+    { "text": "r", "start": 0.84, "end": 0.88, "loss": 0.0385 },
+    { "text": "y", "start": 0.88, "end": 0.96, "loss": 0.0342 },
+    { "text": " ", "start": 0.96, "end": 1.08, "loss": 0.4718 },
+    { "text": "n", "start": 1.08, "end": 1.16, "loss": 0.0306 },
+    { "text": "i", "start": 1.16, "end": 1.2, "loss": 0.0259 },
+    { "text": "g", "start": 1.2, "end": 1.24, "loss": 0.0327 },
+    { "text": "h", "start": 1.24, "end": 1.3, "loss": 0.0294 },
+    { "text": "t", "start": 1.3, "end": 1.42, "loss": 0.0318 }
+  ],
+  "words": [
+    { "text": "Starry", "start": 0.12, "end": 0.46, "loss": 0.0419 },
+    { "text": "starry", "start": 0.62, "end": 0.96, "loss": 0.0376 },
+    { "text": "night", "start": 1.08, "end": 1.42, "loss": 0.0402 }
+  ]
+}

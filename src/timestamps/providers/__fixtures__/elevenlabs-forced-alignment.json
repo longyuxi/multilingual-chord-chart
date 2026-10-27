@@ -1,0 +1,29 @@
+{
+  "characters": [
+    { "text": "只", "start": 0.8, "end": 1.02, "loss": 0.0612 },
+    { "text": "要", "start": 1.02, "end": 1.24, "loss": 0.0488 },
+    { "text": "你", "start": 1.24, "end": 1.47, "loss": 0.0705 },
+    { "text": "说", "start": 1.47, "end": 1.8, "loss": 0.0831 },
+    { "text": "，", "start": 1.8, "end": 1.86, "loss": 0.4023 },
+    { "text": "\n", "start": null, "end": null, "loss": null },
+    { "text": "我", "start": 1.96, "end": 2.18, "loss": 0.0527 },
+    { "text": "可", "start": 2.18, "end": 2.38, "loss": 0.0664 },
+    { "text": "以", "start": 2.38, "end": 2.6, "loss": 0.0453 },
+    { "text": "带", "start": 2.6, "end": 2.84, "loss": 0.0738 },
+    { "text": "你", "start": 2.84, "end": 3.06, "loss": 0.0519 },
+    { "text": "到", "start": 3.06, "end": 3.3, "loss": 0.0602 },
+    { "text": "另", "start": 3.3, "end": 3.54, "loss": 0.0791 },
+    { "text": "一", "start": 3.54, "end": 3.72, "loss": 0.0558 },
+    { "text": "片", "start": 3.72, "end": 3.98, "loss": 0.0688 },
+    { "text": "海", "start": 3.98, "end": 4.3, "loss": 0.0641 },
+    { "text": "域", "start": 4.3, "end": 4.62, "loss": 0.0894 }
+  ],
+  "words": [
+    { "text": "只要", "start": 0.8, "end": 1.24, "loss": 0.0428 },
+    { "text": "你说", "start": 1.24, "end": 1.8, "loss": 0.0556 },
+    { "text": "我可以", "start": 1.96, "end": 2.6, "loss": 0.0391 },
+    { "text": "带你到", "start": 2.6, "end": 3.3, "loss": 0.0574 },
+    { "text": "另一片", "start": 3.3, "end": 3.98, "loss": 0.0512 },
+    { "text": "海域", "start": 3.98, "end": 4.62, "loss": 0.0489 }
+  ]
+}

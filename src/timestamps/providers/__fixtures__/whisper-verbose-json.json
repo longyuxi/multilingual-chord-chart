@@ -1,0 +1,15 @@
+{
+  "task": "transcribe",
+  "language": "zh",
+  "duration": 4.62,
+  "text": "只要你说 我可以带你到另一片海域",
+  "words": [
+    { "word": "只要", "start": 0.78, "end": 1.26 },
+    { "word": "你说", "start": 1.26, "end": 1.82 },
+    { "word": "我可以", "start": 1.94, "end": 2.62 },
+    { "word": " 带你到", "start": 2.62, "end": 3.34 },
+    { "word": "另一片", "start": 3.32, "end": 4.0 },
+    { "word": "海域", "start": 4.0, "end": 4.6 },
+    { "word": "，", "start": 4.6, "end": 4.7 }
+  ]
+}
