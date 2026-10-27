@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { Song } from './songs';
 import { parseEcbBlocks, EcbBlock, EcbSegment, formatTimestamp } from './ecb-viewer-parser';
 import { transposeChord } from './chord-transposer';
@@ -62,11 +62,79 @@ function scaledRowHeight(scale: number): string {
   return ROW_HEIGHT_CLASSES[idx];
 }
 
+// Dev-only seek aid (tab-pinyinizer-ilg.9): following the playhead through the
+// chart and stepping marker-to-marker exist to check generated timestamps, so
+// the production UI keeps neither the highlight nor the hotkey.
+const SEEK_AID_ENABLED = import.meta.env.DEV;
+
+// Markers are whole-second floored, so anything this close ahead is either the
+// marker just seeked to or a duplicate of that second: skip both instead of
+// re-seeking to the line already playing.
+const SEEK_AID_STEP_TOLERANCE = 0.5;
+
+/** A `@M:SS` marker together with the rendered segments it covers. */
+type PlayheadMarker = {
+  time: number;
+  /** Index into the rendered block list (`renderLayout`). */
+  block: number;
+  /** First segment of the marker's run inside that block. */
+  segment: number;
+  /**
+   * One past the last covered segment. A marker sits on the first segment of a
+   * source line and the next marker opens the next one, so a run between two
+   * markers is one line — highlighting the run beats lighting up only the
+   * annotated segment (which is what reflow mode would otherwise show).
+   */
+  endSegment: number;
+};
+
+/**
+ * Flattens the chart's markers in playback order while recording where each one
+ * landed in the rendered blocks. Markers are normally written in order already;
+ * sorting by time keeps a hand-edited file from making "next marker" walk
+ * backwards (tab-pinyinizer-ilg.9).
+ */
+function collectPlayheadMarkers(blocks: RenderBlock[]): PlayheadMarker[] {
+  const markers: PlayheadMarker[] = [];
+
+  blocks.forEach((block, blockIdx) => {
+    if (block.kind !== 'lyric_line' && block.kind !== 'lyric_flow') return;
+    block.segments.forEach((segment, segmentIdx) => {
+      if (segment.time === undefined) return;
+      const previous = markers[markers.length - 1];
+      if (previous && previous.block === blockIdx) previous.endSegment = segmentIdx;
+      markers.push({
+        time: segment.time,
+        block: blockIdx,
+        segment: segmentIdx,
+        endSegment: block.segments.length,
+      });
+    });
+  });
+
+  return markers.sort((a, b) => a.time - b.time);
+}
+
+/** Index of the marker nearest at or before `seconds`, or -1 before the first. */
+function findActiveMarkerIndex(markers: PlayheadMarker[], seconds: number): number {
+  for (let i = markers.length - 1; i >= 0; i--) {
+    if (markers[i].time <= seconds) return i;
+  }
+  return -1;
+}
+
+/** Whether the playhead's marker covers this segment of this block. */
+function markerCovers(active: PlayheadMarker | null, block: number, segment: number): boolean {
+  return active !== null && active.block === block && segment >= active.segment && segment < active.endSegment;
+}
+
 type RenderContext = {
   enabledLangs: Set<number>;
   transpose: number;
   scale: number;
   onSeek: ((seconds: number) => void) | null;
+  /** Marker under the playhead, or null when the seek aid is off / not started. */
+  activeMarker: PlayheadMarker | null;
 };
 
 function TimestampLink({ seconds, onSeek, scale }: { seconds: number; onSeek: (seconds: number) => void; scale: number }) {
@@ -83,7 +151,7 @@ function TimestampLink({ seconds, onSeek, scale }: { seconds: number; onSeek: (s
 }
 
 function renderBlock(block: RenderBlock, idx: number, ctx: RenderContext): React.ReactNode {
-  const { enabledLangs, transpose, scale, onSeek } = ctx;
+  const { enabledLangs, transpose, scale, onSeek, activeMarker } = ctx;
   switch (block.kind) {
     case 'config_table':
       return (
@@ -137,8 +205,11 @@ function renderBlock(block: RenderBlock, idx: number, ctx: RenderContext): React
       // Reserve the timestamp row for every column in the line, not just the
       // annotated ones, so chords keep lining up with the lyrics below them.
       const showTimes = onSeek !== null && block.segments.some(seg => seg.time !== undefined);
+      // One non-reflow block is exactly one source lyric line, so any marker in
+      // it highlights the line.
+      const isActive = activeMarker !== null && activeMarker.block === idx;
       return (
-        <table key={idx} className="border-collapse my-2">
+        <table key={idx} className={`border-collapse my-2${isActive ? ' bg-amber-100' : ''}`}>
           <tbody>
             {showTimes && (
               <tr>
@@ -191,8 +262,9 @@ function renderBlock(block: RenderBlock, idx: number, ctx: RenderContext): React
         <div key={idx} className="flex flex-wrap items-start gap-x-3 gap-y-2 my-2">
           {block.segments.map((seg, i) => {
             const { text: chordText, valid } = transposeChord(seg.chord, transpose);
+            const isActive = markerCovers(activeMarker, idx, i);
             return (
-              <div key={i} className="whitespace-nowrap">
+              <div key={i} className={`whitespace-nowrap${isActive ? ' bg-amber-100 rounded-sm' : ''}`}>
                 {showTimes && (
                   <div className={`${scaledRowHeight(scale)} leading-none`}>
                     {seg.time !== undefined && <TimestampLink seconds={seg.time} onSeek={onSeek!} scale={scale} />}
@@ -287,6 +359,71 @@ export default function MusicView({ song, onBack }: Props) {
   const [reflow, setReflow] = useState(true);
   const [fontScale, setFontScale] = useState(1);
   const [widthIdx, setWidthIdx] = useState(WIDTH_OPTIONS.length - 1);
+
+  // `before` / `after` are the two rendered block lists (the config table and
+  // whatever follows it). Block indices passed to renderBlock are dense
+  // positions across them — `before` first, then `after` — because reflow makes
+  // `after` shorter than the source block list, so source indices would not
+  // lead back to a rendered block.
+  const renderLayout = useMemo(() => {
+    const splitIdx = blocks.findIndex(b => b.kind === 'config_table');
+    const before = splitIdx >= 0 ? blocks.slice(0, splitIdx + 1) : [];
+    const afterRaw = splitIdx >= 0 ? blocks.slice(splitIdx + 1) : blocks;
+    const after: RenderBlock[] = reflow ? groupForReflow(afterRaw) : afterRaw;
+    return { before, after };
+  }, [blocks, reflow]);
+
+  const playheadMarkers = useMemo(
+    () => collectPlayheadMarkers([...renderLayout.before, ...renderLayout.after]),
+    [renderLayout]
+  );
+
+  const [activeMarkerIdx, setActiveMarkerIdx] = useState(-1);
+  const activeMarkerRef = useRef(-1);
+  const playheadRef = useRef(0);
+
+  const handleTimeUpdate = useCallback((seconds: number) => {
+    playheadRef.current = seconds;
+    const nextIdx = findActiveMarkerIndex(playheadMarkers, seconds);
+    // The player reports at 4Hz; re-render only when the highlighted line
+    // actually changes, not on every tick.
+    if (nextIdx !== activeMarkerRef.current) {
+      activeMarkerRef.current = nextIdx;
+      setActiveMarkerIdx(nextIdx);
+    }
+  }, [playheadMarkers]);
+
+  // Toggling reflow renumbers the blocks, so an index from the previous layout
+  // must not survive into the new one.
+  useEffect(() => {
+    activeMarkerRef.current = -1;
+    setActiveMarkerIdx(-1);
+  }, [playheadMarkers]);
+
+  // Dev-only hotkey: `n` seeks to the next marker and keeps playing, so a whole
+  // run can be checked without touching the player (tab-pinyinizer-ilg.9).
+  useEffect(() => {
+    if (!SEEK_AID_ENABLED || !youtubeId) return;
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
+      if (event.key.toLowerCase() !== 'n') return;
+      const target = event.target as HTMLElement | null;
+      const tag = target?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target?.isContentEditable) return;
+
+      const next = playheadMarkers.find(m => m.time > playheadRef.current + SEEK_AID_STEP_TOLERANCE);
+      if (!next) return;
+      event.preventDefault();
+      // Move the playhead reference immediately: the next poll that reports the
+      // new position can land after a second keypress.
+      playheadRef.current = next.time;
+      seekTo(next.time);
+    }
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [playheadMarkers, seekTo, youtubeId]);
 
   function toggleLang(i: number) {
     setEnabledLangs(prev => {
@@ -416,25 +553,28 @@ export default function MusicView({ song, onBack }: Props) {
 
       <main className={`mx-auto ${WIDTH_OPTIONS[widthIdx].className} px-4 sm:px-6 py-8`}>
         {(() => {
-          const splitIdx = blocks.findIndex(b => b.kind === 'config_table');
-          const before = splitIdx >= 0 ? blocks.slice(0, splitIdx + 1) : [];
-          const afterRaw = splitIdx >= 0 ? blocks.slice(splitIdx + 1) : blocks;
-          const after: RenderBlock[] = reflow ? groupForReflow(afterRaw) : afterRaw;
           const ctx: RenderContext = {
             enabledLangs,
             transpose,
             scale: fontScale,
             onSeek: youtubeId ? seekTo : null,
+            activeMarker: SEEK_AID_ENABLED && activeMarkerIdx >= 0 ? playheadMarkers[activeMarkerIdx] : null,
           };
           return (
             <>
-              {before.map((block, idx) => renderBlock(block, idx, ctx))}
+              {renderLayout.before.map((block, idx) => renderBlock(block, idx, ctx))}
               {youtubeId && (
                 <div ref={playerHostRef} className="mb-6 w-4/5 mx-auto scroll-mt-36">
-                  <YoutubePlayer videoId={youtubeId} seekRequest={seekRequest} />
+                  <YoutubePlayer
+                    videoId={youtubeId}
+                    seekRequest={seekRequest}
+                    onTimeUpdate={SEEK_AID_ENABLED ? handleTimeUpdate : undefined}
+                  />
                 </div>
               )}
-              {after.map((block, idx) => renderBlock(block, splitIdx + 1 + idx, ctx))}
+              {renderLayout.after.map((block, idx) =>
+                renderBlock(block, renderLayout.before.length + idx, ctx)
+              )}
             </>
           );
         })()}

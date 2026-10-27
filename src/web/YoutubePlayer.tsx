@@ -9,14 +9,26 @@ export type SeekRequest = {
 type Props = {
   videoId: string;
   seekRequest: SeekRequest | null;
+  /**
+   * Playhead position in seconds, reported a few times a second while the
+   * player exists. Optional: leaving it out skips polling entirely, which is
+   * what the production viewer does (tab-pinyinizer-ilg.9).
+   */
+  onTimeUpdate?: (seconds: number) => void;
 };
 
 // Only the pieces of the IFrame API surface this component touches.
 type YtPlayer = {
   seekTo(seconds: number, allowSeekAhead: boolean): void;
   playVideo(): void;
+  getCurrentTime(): number;
   destroy(): void;
 };
+
+// Highlighting the line under the playhead only has to keep up with the eye,
+// so the poll is 4Hz against a local value rather than the API's own event
+// stream (tab-pinyinizer-ilg.9).
+const TIME_POLL_MS = 250;
 
 // The IFrame API installs itself as one global and reports readiness through a
 // single global callback, so every player on the page has to share one load.
@@ -60,11 +72,29 @@ function applySeek(player: YtPlayer | null, request: SeekRequest): void {
  * `playVideo()` is only ever called from a click handler, so the browser's
  * autoplay-with-sound policy is satisfied by that user gesture.
  */
-export default function YoutubePlayer({ videoId, seekRequest }: Props) {
+export default function YoutubePlayer({ videoId, seekRequest, onTimeUpdate }: Props) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const playerRef = useRef<YtPlayer | null>(null);
   const readyRef = useRef(false);
   const pendingSeekRef = useRef<SeekRequest | null>(null);
+  // The poll interval is installed once, so it reads the current callback
+  // through a ref instead of the one captured by the render that created it.
+  const onTimeUpdateRef = useRef(onTimeUpdate);
+  const pollEnabled = onTimeUpdate !== undefined;
+
+  useEffect(() => {
+    onTimeUpdateRef.current = onTimeUpdate;
+  }, [onTimeUpdate]);
+
+  useEffect(() => {
+    if (!pollEnabled) return;
+    const id = window.setInterval(() => {
+      const player = playerRef.current;
+      if (!readyRef.current || !player) return;
+      onTimeUpdateRef.current?.(player.getCurrentTime());
+    }, TIME_POLL_MS);
+    return () => window.clearInterval(id);
+  }, [pollEnabled]);
 
   useEffect(() => {
     const host = hostRef.current;
