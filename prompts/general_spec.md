@@ -35,6 +35,9 @@
 
 % The language for each lyric is specified using the languages configuration parameter (comma separated, leading and trailing whitespaces stripped). For example, the languages configuration parameters for the above should be
 % %%languages chinese, pinyin
+% The second track is a romanization of the first: pinyin for Mandarin, jyutping for Cantonese.
+% Whichever is used, it is one space-separated token per sung syllable, without tone marks.
+% The translation track is named english (docs/song-standard.md), not translation.
 % A non-empty lyric segment should have as many languages as this parameter specifies.
 
 % Additional configuration options may be set and will be saved as metadata for the downstream application.
