@@ -5,6 +5,11 @@ exactly one module and speaks only in the types from `src/timestamps/types.ts`,
 so the stages stay independently replaceable and the parallel work doesn't
 collide.
 
+Pipeline-level description -- stages in order, prerequisites (the `yt-dlp`
+version floor), provider choice, cache layout, failure modes, marker policy and
+the measured numbers -- lives in `docs/timestamp-pipeline.md`. This file stays
+the per-module interface note.
+
 ## Module ownership
 
 | Module | Issue | Owns |
@@ -12,17 +17,19 @@ collide.
 | `src/timestamps/types.ts`, `paths.ts`, `env.ts`, `pinyin.ts`, `ecb-markers.ts` | ilg.15 | Shared contracts. Do not edit from a stage child. |
 | `src/timestamps/audio.ts` | ilg.1 | `%%youtube` lookup, yt-dlp download, ffprobe duration, audio cache |
 | `src/timestamps/normalize.ts` | ilg.2 | ECB → `NormalizedLyrics` (primary language, syllables, `lyricHash`) |
-| `src/timestamps/providers/*.ts` | ilg.3 | `AsrProviderClient` implementations + `asr.json` caching |
+| `src/timestamps/providers/*.ts` | ilg.3 | `AsrProviderClient` implementations + ASR result caching |
 | `src/timestamps/align.ts` | ilg.4 | affine-gap DP over syllables × tokens → `AlignReport` |
 | `src/timestamps/ecb-timestamps.ts` | ilg.5 | Strip/insert standalone `@M:SS` marker lines |
 | `src/timestamps/cli.ts` | ilg.6 | `npm run timestamps` orchestration and flags |
 | `src/timestamps/check.ts` | ilg.7 | `npm run check-timestamps` offline verifier |
+| `src/timestamps/golden.ts` | ilg.8 | `npm run golden-timestamps` offline gate against the hand-made markers |
 | `prompts/fix_timestamps.md`, `src/timestamps/repair.ts` | ilg.10 | Bounded patch pass over flagged lines |
 | `src/web/MusicView.tsx`, `YoutubePlayer.tsx` | ilg.9 | Dev-only playhead highlight + jump-to-next |
 
-`package.json` scripts (`timestamps`, `check-timestamps`) and `tsconfig.json`
-are already wired; `src/**/*` is included and `src/web` stays excluded
-(`tab-pinyinizer-xql`). A stage child should not need to touch either file.
+`package.json` scripts (`timestamps`, `check-timestamps`, `golden-timestamps`)
+and `tsconfig.json` are already wired; `src/**/*` is included and `src/web` stays
+excluded (`tab-pinyinizer-xql`). A stage child should not need to touch either
+file.
 
 ## Stage boundaries
 
@@ -30,7 +37,7 @@ are already wired; `src/**/*` is included and `src/web` stays excluded
 .ecb ──audio.ts──▶ .cache/timestamps/audio/<videoId>.mp3  (duration via ffprobe)
 .ecb ──normalize.ts──▶ NormalizedLyrics { lineIndex, text, syllables, lyricHash }
                               │
-                    providers/*.ts ──▶ AsrResult (cached as asr.json)
+                    providers/*.ts ──▶ AsrResult (cached in asr/<videoId>/; see paths.ts)
                               │
                           align.ts ──▶ AlignReport
                               │
@@ -79,4 +86,6 @@ are already wired; `src/**/*` is included and `src/web` stays excluded
 - OpenAI `whisper-1` `verbose_json` + `timestamp_granularities[]=word` is the
   independent corroboration stream (~US$0.006/min). Its *text* is not used.
 - `gpt-4o-transcribe` is explicitly excluded: segment-level only, no word times.
-- `youtube-auto` (ilg.11) is a free fast-fail probe, never a dependency.
+- `youtube-auto` (ilg.11, **not built yet**) is a free fast-fail probe, never a
+dependency. Demucs stems (ilg.12, not built yet) are the same: the `vocals` audio
+source is reserved in the cache key, and nothing separates vocals today.

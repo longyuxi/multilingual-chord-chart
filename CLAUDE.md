@@ -13,11 +13,15 @@ npm run build:web  # production build of the web app -> dist-web/ (deploy target
 npm run preview    # preview a build:web output
 
 npm run build:cli  # tsc build of the legacy CLI pipeline (src/*.ts, excl. src/web) -> dist/
+
+npm run timestamps -- [options] [songs/a.ecb ...]  # align a song's lyrics to its embedded video -> line-level @M:SS markers
+npm run check-timestamps [songs/a.ecb ...]         # offline verifier of existing markers (no network, no key)
+npm run golden-timestamps                          # offline golden gate against condensed_blue_whale's hand-made markers
 ```
 
 There is no test runner, linter, or CI config in this repo — don't invent `npm test`/`npm run lint` commands. `npm run build:cli` (tsc, strict mode) is the closest thing to a correctness check for the non-web TypeScript, and `tsc -p tsconfig.web.json --noEmit` type-checks `src/web/` (no script wired up for it currently).
 
-The legacy CLI pipeline scripts (`check-alignment`, `parse-example`, `ug-to-html`, `tab-to-ecb`) all run compiled output from `dist/`, so `npm run build:cli` must be run first for any of them to work.
+The legacy CLI pipeline scripts (`check-alignment`, `parse-example`, `ug-to-html`, `tab-to-ecb`) all run compiled output from `dist/`, so `npm run build:cli` must be run first for any of them to work. The timestamp scripts (`timestamps`, `check-timestamps`, `golden-timestamps`) run from `dist/` too, so the same build step applies to them.
 
 ## Architecture Overview
 
@@ -36,6 +40,13 @@ This repo is two things bolted together: a **live web viewer** (current, primary
 - Superseded by the prompt-driven ECB workflow below for new work; only reach for this pipeline when converting an old UG-format tab.
 
 **Song format (ECB):** `.ecb` is this project's own plain-text notation — spec and worked example in `format_spec/format_spec.ecb` and `prompts/general_spec.md`. Key shape: `%%key value` metadata lines, `<Section Title>` headers, and lyric lines made of `[Chord]lang1|lang2|...` segments, where `%%languages` in the header declares how many `|`-separated languages each segment carries and in what order.
+
+**Timestamp pipeline** (`src/timestamps/`, compiled by the same `tsc` per `tsconfig.json`):
+- Purpose: turn a song's known lyrics into line-level `@M:SS` markers by aligned ASR/forced alignment against the audio of the video the file embeds — times are always relative to that video's 0:00, and audio always comes from `%%youtube`. It only writes markers — never lyrics, chords or any other line.
+- `cli.ts` is the `npm run timestamps` entry point, sequencing per song: `audio.ts` (yt-dlp download + ffprobe duration, cached under `.cache/timestamps/`) → `normalize.ts` (lyrics → syllables + `lyricHash`) → `providers/*.ts` (ElevenLabs forced alignment primary, whisper-1 corroboration; cached paid calls) → `align.ts` (deterministic DP → `AlignReport` with per-line flags) → optional `repair.ts` (bounded LLM patch over flagged lines, from `prompts/fix_timestamps.md`) → `ecb-timestamps.ts` (strip every existing marker, emit one standalone marker per anchored line).
+- `check.ts` is `npm run check-timestamps`, the offline verifier (marker order/duplicates/duration/rate); `golden.ts` is `npm run golden-timestamps`, which replays the pipeline against a committed whisper-1 fixture and gates on `songs/condensed_blue_whale.ecb`'s hand-made markers. Both need no key and no network.
+- Pipeline-level docs: `docs/timestamp-pipeline.md` (prerequisites incl. the yt-dlp version floor, cache layout, failure modes, measured numbers); module-boundary note: `docs/timestamps-contract.md`; operational recipe: `.claude/skills/add-timestamps/SKILL.md`.
+- `src/web/MusicView.tsx` has a dev-only seek aid (`npm run dev`, press `n`) for spot-checking markers; it is compiled out of the production build.
 
 ## Conventions & Patterns
 
