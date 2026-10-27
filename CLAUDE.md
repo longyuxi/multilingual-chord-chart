@@ -14,12 +14,15 @@ npm run preview    # preview a build:web output
 
 npm run build:cli  # tsc build of the legacy CLI pipeline (src/*.ts, excl. src/web) -> dist/
 
+npm run audit-songs -- [options] [songs/a.ecb ...]  # audit every song against docs/song-standard.md
 npm run timestamps -- [options] [songs/a.ecb ...]  # align a song's lyrics to its embedded video -> line-level @M:SS markers
 npm run check-timestamps [songs/a.ecb ...]         # offline verifier of existing markers (no network, no key)
 npm run golden-timestamps                          # offline golden gate against condensed_blue_whale's hand-made markers
 ```
 
 There is no test runner, linter, or CI config in this repo — don't invent `npm test`/`npm run lint` commands. `npm run build:cli` (tsc, strict mode) is the closest thing to a correctness check for the non-web TypeScript, and `tsc -p tsconfig.web.json --noEmit` type-checks `src/web/` (no script wired up for it currently).
+
+`npm run audit-songs` measures every `songs/*.ecb` against the song standard (tracks, syllable fit, timestamps, text hygiene) and is the gate the per-song remediation tasks are written against: it is the only check that spans all songs, so run it before claiming a song is done. `--json` for machine consumption, `--check` to gate, `--verbose` for per-line detail. It needs `npm run build:cli` first, and it shells out once to `lyric-translator-tools`' `syllable_tools/C_cli.py --count` for English syllable counts (batch mode; see that repo's README).
 
 The legacy CLI pipeline scripts (`check-alignment`, `parse-example`, `ug-to-html`, `tab-to-ecb`) all run compiled output from `dist/`, so `npm run build:cli` must be run first for any of them to work. The timestamp scripts (`timestamps`, `check-timestamps`, `golden-timestamps`) run from `dist/` too, so the same build step applies to them.
 
