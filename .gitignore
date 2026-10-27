@@ -1,6 +1,16 @@
 # Dependencies
 node_modules/
 
+# Local env files: contain API keys for the timestamp pipeline
+# (tab-pinyinizer-ilg.14). Never commit these.
+.env
+.env.local
+.env.*.local
+
+# Timestamp pipeline cache: downloaded audio + paid ASR results
+# (tab-pinyinizer-ilg.1). Reproducible from (videoId, provider, lyrics).
+.cache/
+
 # TypeScript build output
 dist/
 dist-web
@@ -19,10 +29,6 @@ Thumbs.db
 # .vscode/
 # *.swp
 # *.swo
-
-# Optional: local env (if you add .env later)
-# .env
-# .env.local
 
 # joworking folders
 convert/
